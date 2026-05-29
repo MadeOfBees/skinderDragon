@@ -1,40 +1,77 @@
 import { useEffect, useRef } from "react";
-import p0 from "../assets/panorama/panorama_0.webp";
-import p1 from "../assets/panorama/panorama_1.webp";
-import p2 from "../assets/panorama/panorama_2.webp";
-import p3 from "../assets/panorama/panorama_3.webp";
-import p4 from "../assets/panorama/panorama_4.webp";
-import p5 from "../assets/panorama/panorama_5.webp";
 
-// The six cube faces of Minecraft's title panorama: 0-3 wrap around the horizon
-// (left→right), 4 is the sky (up) and 5 is the ground (down).
-const PANORAMA = [p0, p1, p2, p3, p4, p5];
+export type PanoramaSource = "release" | "snapshot";
 
-// three.js BoxGeometry material slots are ordered [+X, -X, +Y, -Y, +Z, -Z].
-// We sit the camera inside the box and map each slot to the matching panorama
-// face so the four horizon images stay adjacent (no seams) and 4/5 cap the
-// top/bottom — exactly how the game projects it.
-const SLOT_TO_FACE = [1, 3, 4, 5, 0, 2];
+// Panorama faces live in public/panorama/<channel>/ — served as static files,
+// not bundled. Run `npm run assets:refresh` to download them from Mojang's CDN.
+// `npm run dev` (via assets:ensure), `npm run smoke`, and the Pages deploy all
+// fetch them automatically; without the files the panorama silently 404s.
+// BASE_URL is "/" in dev and "/skinderdragon/" in production (see vite.config.ts).
+const base = import.meta.env.BASE_URL;
+// The six faces of Minecraft's title panorama, in the game's own numbering:
+//   0 → ahead   1 → right   2 → behind   3 → left   4 → up (sky)   5 → down (ground)
+const FACES: Record<PanoramaSource, string[]> = {
+  release: Array.from({ length: 6 }, (_, i) => `${base}panorama/release/panorama_${i}.webp`),
+  snapshot: Array.from({ length: 6 }, (_, i) => `${base}panorama/snapshot/panorama_${i}.webp`),
+};
 
 const ROTATE_SPEED = 0.018; // radians/sec — a slow, menu-like drift
 const PITCH = -0.06; // tilt the horizon down a touch, like the real menu
 
 /**
- * The rotating title-screen panorama, rendered the way Minecraft does it: a
- * cubemap skybox viewed from the inside with the camera slowly panning. Replaces
- * the old flat-strip hack (which warped the cube faces and showed seams).
+ * How Minecraft's title panorama is authored — and how we reproduce it.
  *
- * three.js is imported lazily (it's the bulk of the bundle and shared with the
+ * The six PNGs are the faces of a cube the game views from the inside. Per the
+ * Minecraft Wiki's "Making custom panoramas" the authoring convention is:
+ *   • 0,1,2,3 are the horizontal ring, left→right — i.e. as you turn *right*,
+ *     face N's RIGHT edge continues into face N+1's LEFT edge (…3 wraps to 0);
+ *   • 4 is the top (sky): its BOTTOM edge borders the TOP of face 0;
+ *   • 5 is the bottom (ground): its TOP edge borders the BOTTOM of face 0.
+ *
+ * We render it with six inward-facing planes, one per face. A three.js plane
+ * faces +Z, so a plane pushed to local z = -1 sits one unit *ahead* of the
+ * camera (which looks down -Z) and shows its front to us — that's face 0, with
+ * its texture upright and un-mirrored (we view the plane's front, so there's no
+ * BackSide UV mirroring to undo, unlike the old single-box skybox). Each face's
+ * plane is parented to a pivot Group whose rotation swings it onto a cube wall.
+ *
+ * Choosing the pivot rotations: a *positive* Y rotation in three.js turns the
+ * view LEFT, but the faces are authored for turning RIGHT, so faces 1 and 3 get
+ * NEGATIVE/positive 90° (the mirror image of the angles you'd transcribe from
+ * Minecraft's own matrix code, whose camera handedness differs). The exact signs
+ * here were nailed down empirically by pixel-matching adjacent face edges on the
+ * real textures: with these values every neighbour matches (edge MSE ~3–270),
+ * and the +90°/-90° X pivots land the sky/ground caps in the orientation the
+ * Wiki describes (face 4 bottom→face 0 top, etc.). Get the horizon signs wrong
+ * and adjacent edges mismatch by MSE ~6000+, which is the hard vertical seam
+ * between panels this code originally shipped with.
+ *
+ * three.js is imported lazily (it's the bulk of the bundle, shared with the
  * skin viewer) so the title and form paint before the background spins up. The
  * canvas is blurred/darkened via CSS so it reads as ambient background.
  */
-export function Panorama({ paused = false }: { paused?: boolean }) {
+export function Panorama({
+  paused = false,
+  source = "release",
+}: {
+  paused?: boolean;
+  source?: PanoramaSource;
+}) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  // Kept in a ref so the running render loop sees changes without re-running the
+  // Kept in refs so the running render loop sees changes without re-running the
   // setup effect. We pause the background during GIF export so it doesn't
   // contend with the (offscreen) export renderer for the GPU.
   const pausedRef = useRef(paused);
   pausedRef.current = paused;
+  const sourceRef = useRef(source);
+
+  // Swapping channels without tearing down the whole renderer: when `source`
+  // changes we re-point the six face textures (see the loadFaces ref below).
+  const reloadFacesRef = useRef<((src: PanoramaSource) => void) | null>(null);
+  useEffect(() => {
+    sourceRef.current = source;
+    reloadFacesRef.current?.(source);
+  }, [source]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -61,21 +98,70 @@ export function Panorama({ paused = false }: { paused?: boolean }) {
       camera.rotation.x = PITCH;
 
       const loader = new THREE.TextureLoader();
-      const textures: import("three").Texture[] = [];
-      const materials = SLOT_TO_FACE.map((faceIndex) => {
-        const tex = loader.load(PANORAMA[faceIndex]);
-        tex.colorSpace = THREE.SRGBColorSpace;
-        // Viewing the box from inside mirrors the texture horizontally; flip it
-        // back so any text/detail in the panorama reads the right way round.
-        tex.wrapS = THREE.RepeatWrapping;
-        tex.repeat.x = -1;
-        textures.push(tex);
-        return new THREE.MeshBasicMaterial({ map: tex, side: THREE.BackSide });
-      });
 
-      const geometry = new THREE.BoxGeometry(2, 2, 2);
-      const skybox = new THREE.Mesh(geometry, materials);
-      scene.add(skybox);
+      // Per-face pivot rotations. Each face's plane sits one unit ahead (local
+      // z = -1) of its pivot; the pivot rotation swings it onto a cube wall.
+      //
+      // The horizon faces 0→1→2→3 form a continuous ring, and the captures are
+      // authored so that face N's RIGHT edge continues into face N+1's LEFT
+      // edge (the camera turns *right* as N increases). In three.js's frame a
+      // positive Y rotation turns the view left, so to keep that right-turning
+      // order we rotate faces 1 and 3 by NEGATIVE/positive-90 respectively —
+      // i.e. the opposite sign you'd naively copy from Minecraft's matrix code.
+      // This was verified by pixel-matching adjacent face edges: with these
+      // signs neighbouring edges match (MSE ~200); with them flipped they don't
+      // (MSE ~6000+), which showed up as a hard seam at every panel boundary.
+      const HALF = Math.PI / 2;
+      const PIVOTS: Array<{ x: number; y: number }> = [
+        { x: 0, y: 0 }, // 0 ahead  (-Z wall)
+        { x: 0, y: -HALF }, // 1 right  (+X wall)
+        { x: 0, y: Math.PI }, // 2 behind (+Z wall)
+        { x: 0, y: HALF }, // 3 left   (-X wall)
+        { x: HALF, y: 0 }, // 4 up (sky)
+        { x: -HALF, y: 0 }, // 5 down (ground)
+      ];
+
+      // One shared plane geometry for all six faces. Sized 2×2 to exactly span a
+      // face of the unit cube (z = -1, edges at ±1); scaled up a hair so the
+      // quads overlap slightly at the cube edges and never show a hairline seam.
+      const geometry = new THREE.PlaneGeometry(2, 2);
+      const materials: import("three").MeshBasicMaterial[] = [];
+      const textures: import("three").Texture[] = [];
+
+      /** Loads the six faces for a channel into the (re-usable) materials. */
+      function loadFaces(src: PanoramaSource) {
+        FACES[src].forEach((url, i) => {
+          const tex = loader.load(url);
+          tex.colorSpace = THREE.SRGBColorSpace;
+          // Clamp so the slight oversize at the edges samples the edge pixel
+          // rather than wrapping the opposite side of the face in.
+          tex.wrapS = THREE.ClampToEdgeWrapping;
+          tex.wrapT = THREE.ClampToEdgeWrapping;
+          if (materials[i]) {
+            const old = materials[i].map;
+            materials[i].map = tex;
+            materials[i].needsUpdate = true;
+            old?.dispose();
+            textures[i] = tex;
+          } else {
+            materials[i] = new THREE.MeshBasicMaterial({ map: tex });
+            textures[i] = tex;
+          }
+        });
+      }
+      loadFaces(sourceRef.current);
+      reloadFacesRef.current = loadFaces;
+
+      // Build the six pivots, each holding one inward-facing plane at z = -1.
+      PIVOTS.forEach((rot, i) => {
+        const pivot = new THREE.Group();
+        pivot.rotation.set(rot.x, rot.y, 0);
+        const plane = new THREE.Mesh(geometry, materials[i]);
+        plane.position.z = -1;
+        plane.scale.set(1.01, 1.01, 1.01); // kill hairline edge seams
+        pivot.add(plane);
+        scene.add(pivot);
+      });
 
       function resize() {
         const w = window.innerWidth;
@@ -130,6 +216,7 @@ export function Panorama({ paused = false }: { paused?: boolean }) {
         cancelAnimationFrame(raf);
         window.removeEventListener("resize", resize);
         document.removeEventListener("visibilitychange", onVisibility);
+        reloadFacesRef.current = null;
         geometry.dispose();
         materials.forEach((m) => m.dispose());
         textures.forEach((t) => t.dispose());

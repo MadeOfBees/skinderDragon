@@ -1,26 +1,41 @@
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useState, type SyntheticEvent } from "react";
 import { fetchProfile, ProfileError, type MinecraftProfile } from "./lib/profile";
 import { generateGif, type AnimationMode, type Background } from "./lib/exportGif";
-import { Panorama } from "./components/Panorama";
+import { Panorama, type PanoramaSource } from "./components/Panorama";
+import { Settings } from "./components/Settings";
 import { Toast } from "./components/Toast";
 import { usePreview } from "./hooks/usePreview";
 import { renderHead, renderCape } from "./lib/head";
 import { loadLastSearch, rememberLastSearch, setFavicon } from "./lib/favicon";
+import { loadPanoramaSource, savePanoramaSource } from "./lib/settings";
+import { seg } from "./lib/ui";
 import { randomSplash } from "./data/splashes";
-
-const seg = (active: boolean) =>
-  `mc-btn ${active ? "mc-btn-green" : "mc-btn-stone"}`;
 
 const MODES: { id: AnimationMode; label: string }[] = [
   { id: "run", label: "Run" },
-  { id: "orbit", label: "Orbit" },
-  { id: "wave", label: "Wave" },
   { id: "sneak", label: "Sneak" },
   { id: "fly", label: "Fly" },
 ];
 
+const modeLabel = (id: AnimationMode) =>
+  MODES.find((m) => m.id === id)?.label ?? id;
+
 // The classic "render me upside-down" usernames.
 const FLIP_NAMES = /^(dinnerbone|grumm)$/i;
+
+// Optional GIF size/frame-count overrides via URL query (`?gifSize=256&gifFrames=8`).
+// Production defaults (512px, 30 frames) apply when absent; the headless smoke
+// test uses this to render tiny GIFs so CI stays fast. Clamped to sane bounds.
+const GIF_OVERRIDES: { size?: number; frames?: number } = (() => {
+  const out: { size?: number; frames?: number } = {};
+  if (typeof location === "undefined") return out;
+  const p = new URLSearchParams(location.search);
+  const size = Number(p.get("gifSize"));
+  if (Number.isFinite(size) && size >= 64 && size <= 512) out.size = size;
+  const frames = Number(p.get("gifFrames"));
+  if (Number.isFinite(frames) && frames >= 1 && frames <= 60) out.frames = frames;
+  return out;
+})();
 
 export function App() {
   const [username, setUsername] = useState("");
@@ -31,8 +46,13 @@ export function App() {
   const [capeUrl, setCapeUrl] = useState<string | null>(null);
 
   const [mode, setMode] = useState<AnimationMode>("run");
+  const [orbit, setOrbit] = useState(false);
+  const [showNametag, setShowNametag] = useState(false);
   const [bgKind, setBgKind] = useState<"transparent" | "color">("color");
   const [bgColor, setBgColor] = useState("#1d2030");
+
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [panoramaSource, setPanoramaSource] = useState<PanoramaSource>(loadPanoramaSource);
 
   const [generating, setGenerating] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -42,7 +62,7 @@ export function App() {
   const [splash] = useState(randomSplash);
 
   const upsideDown = !!profile && FLIP_NAMES.test(profile.username);
-  const canvasRef = usePreview(profile, mode, upsideDown);
+  const canvasRef = usePreview(profile, mode, orbit, showNametag, upsideDown, generating);
 
   // On first load, restore the last-searched player: favicon + prefilled name.
   useEffect(() => {
@@ -95,7 +115,12 @@ export function App() {
 
   const dismissToast = useCallback(() => setToast(null), []);
 
-  async function onSubmit(e: FormEvent) {
+  const changePanoramaSource = useCallback((source: PanoramaSource) => {
+    setPanoramaSource(source);
+    savePanoramaSource(source);
+  }, []);
+
+  async function onSubmit(e: SyntheticEvent) {
     e.preventDefault();
     if (loading) return;
     setError(null);
@@ -130,9 +155,13 @@ export function App() {
         capeUrl: profile.capeUrl,
         slim: profile.slim,
         mode,
+        orbit,
+        showNametag,
+        username: profile.username,
         background,
         upsideDown,
         onProgress: setProgress,
+        ...GIF_OVERRIDES,
       });
       setGifUrl(URL.createObjectURL(blob));
       setToast("Picture Perfect");
@@ -146,14 +175,33 @@ export function App() {
 
   return (
     <>
-      <Panorama paused={generating} />
+      <Panorama paused={generating} source={panoramaSource} />
       <Toast message={toast} headUrl={headUrl} onDismiss={dismissToast} />
+
+      <button
+        type="button"
+        data-testid="open-settings"
+        aria-label="Settings"
+        title="Settings"
+        onClick={() => setSettingsOpen(true)}
+        className="mc-btn mc-btn-stone mc-btn-icon mc-btn-gear fixed top-3 right-3 z-50"
+      >
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z" />
+        </svg>
+      </button>
+      <Settings
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        panoramaSource={panoramaSource}
+        onPanoramaSource={changePanoramaSource}
+      />
 
       <div className="relative z-0 mx-auto w-full max-w-3xl px-5 pt-10 pb-24">
         <header className="mb-8 text-center">
           <span className="relative inline-block">
-            <h1 className="mc-title text-[1.5rem] sm:text-[2.1rem]">🐉 skinderdragon</h1>
-            <span className="mc-splash absolute -right-6 -bottom-3 text-[0.7rem] sm:text-[0.8rem]">
+            <h1 className="mc-title text-[1.5rem] sm:text-[2.1rem]">skinderdragon</h1>
+            <span className="mc-splash absolute -right-4 -bottom-2 text-[0.5rem] sm:text-[0.58rem]">
               {splash}
             </span>
           </span>
@@ -202,7 +250,9 @@ export function App() {
                       <img
                         src={capeUrl}
                         alt={`${profile.username}'s cape`}
-                        className="pixelated h-10 border-2 border-black"
+                        // Scale with the username text rather than towering over
+                        // it: ~1.25em tall, keeping the cape's 10:16 aspect.
+                        className="pixelated h-[1.25em] w-auto border border-black"
                       />
                     ) : (
                       <span className="mc-tag">cape</span>
@@ -233,7 +283,7 @@ export function App() {
               </div>
             </div>
 
-            <div className="flex w-full max-w-[360px] flex-col gap-4">
+            <div className="flex w-full max-w-90 flex-col gap-4">
               <fieldset className="mc-panel m-0 p-3.5">
                 <legend className="px-1.5 text-[0.7rem] uppercase text-muted">Animation</legend>
                 <div className="grid grid-cols-3 gap-2.5">
@@ -247,6 +297,26 @@ export function App() {
                       {m.label}
                     </button>
                   ))}
+                </div>
+                {/* Orbit and nametag are modifiers, not modes — they layer on
+                    top of whichever animation is selected. */}
+                <div className="mt-2.5 grid grid-cols-2 gap-2.5">
+                  <button
+                    type="button"
+                    aria-pressed={orbit}
+                    className={seg(orbit)}
+                    onClick={() => setOrbit((o) => !o)}
+                  >
+                    Orbit{orbit ? " ✓" : ""}
+                  </button>
+                  <button
+                    type="button"
+                    aria-pressed={showNametag}
+                    className={seg(showNametag)}
+                    onClick={() => setShowNametag((n) => !n)}
+                  >
+                    Nametag{showNametag ? " ✓" : ""}
+                  </button>
                 </div>
               </fieldset>
 
@@ -304,13 +374,14 @@ export function App() {
                       />
                     </div>
                     <span className="mc-tooltip">
-                      {profile.username} · {MODES.find((m) => m.id === mode)?.label} · 512×512
+                      {profile.username} · {modeLabel(mode)}
+                      {orbit ? " + Orbit" : ""} · 512×512
                     </span>
                   </div>
                   <a
                     data-testid="download"
                     href={gifUrl}
-                    download={`${profile.username}-${mode}.gif`}
+                    download={`${profile.username}-${mode}${orbit ? "-orbit" : ""}.gif`}
                     className="mc-btn mc-btn-stone block w-full text-center no-underline"
                   >
                     ⬇ Download GIF

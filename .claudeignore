@@ -1,0 +1,7 @@
+# Never useful to read — large or binary, no logic inside
+package-lock.json
+public/panorama/**
+public/favicon.png
+dist/**
+scripts/smoke-screenshot.png
+scripts/smoke-failure.png

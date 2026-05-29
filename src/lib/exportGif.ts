@@ -1,10 +1,8 @@
 import { GIFEncoder, quantize, applyPalette, type PixelFormat } from "gifenc";
 import { loadSkinview3d } from "./skinview";
 
-export type AnimationMode = "run" | "orbit" | "wave" | "sneak" | "fly";
-
-/** Modes that animate the limbs in place (a seamless loop), vs. orbit a pose. */
-const CYCLE_MODES = new Set<AnimationMode>(["run", "wave"]);
+/** The limb/pose animation. Orbit is a separate toggle (see {@link GifOptions}). */
+export type AnimationMode = "run" | "sneak" | "fly";
 
 export type Background =
   | { kind: "transparent" }
@@ -15,6 +13,12 @@ export interface GifOptions {
   capeUrl: string | null;
   slim: boolean;
   mode: AnimationMode;
+  /** Spin the player a full turn across the loop (mixes with any mode). */
+  orbit: boolean;
+  /** Render the floating username tag above the player. */
+  showNametag: boolean;
+  /** Player name, used for the name tag. */
+  username: string;
   background: Background;
   /** Render the player flipped (the Dinnerbone/Grumm easter egg). */
   upsideDown?: boolean;
@@ -32,17 +36,16 @@ export interface GifOptions {
 // spans a progress interval of 2π / 8 = π/4. Looping over exactly this interval
 // yields a seamless run cycle.
 export const WALK_CYCLE = Math.PI / 4;
-// Mid-stride pose (sin peak → maximum limb extension) for the frozen orbit.
-export const FROZEN_PROGRESS = Math.PI / 16;
-// WaveAnimation drives the arm with sin(progress * π); one full wave spans a
-// progress interval of 2 — looping over it yields a seamless wave.
-export const WAVE_CYCLE = 2;
-// Progress values at which the (non-cyclic) crouch/fly animations have settled
-// into their pose, so we can freeze them and orbit the camera around the pose.
-export const SNEAK_POSE = 1;
-export const FLY_POSE = 2;
+// CrouchAnimation with showProgress reaches a full crouch when progress*8 = 1,
+// i.e. at progress = 0.125. We freeze there for a held sneak pose. (The default
+// showProgress=false floors progress*8, so the old freeze at progress=1 landed
+// on an *even* step → a standing pose, which is why sneak looked broken.)
+export const CROUCH_POSE = 0.125;
+// FlyingAnimation settles into its horizontal pose within ~0.5s (progress 0.5);
+// we freeze a little past that so the elytra have finished expanding.
+export const FLY_POSE = 1.5;
 
-/** Walk-animation progress for frame `i` of `frames` of a given cycle length. */
+/** Animation progress for frame `i` of `frames` over a given cycle length. */
 function cycleProgressForFrame(i: number, frames: number, cycle: number): number {
   return (i / frames) * cycle;
 }
@@ -111,36 +114,57 @@ export async function encodeFramesToGif(
   return gif.bytes();
 }
 
+type Skinview3d = Awaited<ReturnType<typeof loadSkinview3d>>;
+
+/** A mode's animation plus how to drive it: a seamless limb cycle, or a held pose. */
+export interface ModeAnimation {
+  anim: InstanceType<Skinview3d["PlayerAnimation"]>;
+  /** `true` = limbs cycle over `pose`→one loop (run); `false` = settle+hold `pose`. */
+  cyclic: boolean;
+  /** Progress to settle a held pose at (ignored when `cyclic`). */
+  pose: number;
+}
+
 /**
- * Builds the animation for a given mode and reports how to drive it: either a
- * seamless limb cycle (run/wave) or a frozen pose the camera orbits (orbit/
- * sneak/fly).
+ * Builds the animation for a mode and classifies it as a seamless limb cycle
+ * (run) or a held pose (sneak/fly). The single source of truth for the
+ * mode→animation mapping, shared by the live preview and the GIF exporter; each
+ * then drives it its own way (the preview pauses a held pose and plays the cycle
+ * live; the exporter advances frames by hand). `headBobbing` is the only knob
+ * that legitimately differs: the live preview can afford it, but its long period
+ * would break the exporter's short seamless loop.
  */
-function buildAnimation(
-  sv: Awaited<ReturnType<typeof loadSkinview3d>>,
-  mode: AnimationMode
-): { anim: InstanceType<typeof sv.PlayerAnimation>; cycle: number; pose: number } {
+export function createModeAnimation(
+  sv: Skinview3d,
+  mode: AnimationMode,
+  opts: { headBobbing: boolean }
+): ModeAnimation {
   switch (mode) {
-    case "wave":
-      return { anim: new sv.WaveAnimation(), cycle: WAVE_CYCLE, pose: 0 };
-    case "sneak":
-      return { anim: new sv.CrouchAnimation(), cycle: 0, pose: SNEAK_POSE };
+    case "sneak": {
+      const anim = new sv.CrouchAnimation();
+      anim.showProgress = true; // smooth crouch depth, not the stepwise toggle
+      return { anim, cyclic: false, pose: CROUCH_POSE };
+    }
     case "fly":
-      return { anim: new sv.FlyingAnimation(), cycle: 0, pose: FLY_POSE };
-    case "orbit":
+      return { anim: new sv.FlyingAnimation(), cyclic: false, pose: FLY_POSE };
     case "run":
     default: {
       const anim = new sv.WalkingAnimation();
-      anim.headBobbing = false; // long-period head bob would break the short loop
-      return { anim, cycle: WALK_CYCLE, pose: FROZEN_PROGRESS };
+      anim.headBobbing = opts.headBobbing;
+      return { anim, cyclic: true, pose: 0 };
     }
   }
 }
 
 /**
- * Renders a Minecraft player to a seamless looping GIF. Cyclic modes (run, wave)
- * animate the limbs in place; posed modes (orbit, sneak, fly) freeze the pose
- * and orbit the camera around it.
+ * Renders a Minecraft player to a seamless looping GIF.
+ *
+ * The loop is composed of up to two independent, separately-seamless motions:
+ *   • the mode's limb animation — run cycles its limbs; sneak/fly hold a pose;
+ *   • orbit — an optional full turn of the player about the vertical axis.
+ * Both complete a whole number of cycles across `frames`, so any combination
+ * loops cleanly. When neither animates (a held pose with orbit off) we emit a
+ * single frame instead of 30 identical ones.
  */
 export async function generateGif(opts: GifOptions): Promise<Blob> {
   const {
@@ -148,6 +172,9 @@ export async function generateGif(opts: GifOptions): Promise<Blob> {
     capeUrl,
     slim,
     mode,
+    orbit,
+    showNametag,
+    username,
     background,
     upsideDown = false,
     size = 512,
@@ -167,7 +194,8 @@ export async function generateGif(opts: GifOptions): Promise<Blob> {
     renderPaused: true, // we drive every frame by hand
     enableControls: false,
     fov: 40,
-    zoom: 0.7,
+    // Pull back a touch when the name tag is shown so it doesn't clip the top.
+    zoom: showNametag ? 0.6 : 0.7,
     background: background.kind === "color" ? background.color : undefined,
   });
 
@@ -175,14 +203,30 @@ export async function generateGif(opts: GifOptions): Promise<Blob> {
     await viewer.loadSkin(skinUrl, { model: slim ? "slim" : "default" });
     if (capeUrl) await viewer.loadCape(capeUrl);
 
-    const { anim, cycle, pose } = buildAnimation(sv, mode);
-    viewer.animation = anim;
-
-    const cyclic = CYCLE_MODES.has(mode);
+    const { anim, cyclic, pose } = createModeAnimation(sv, mode, { headBobbing: false });
+    viewer.animation = anim; // resets pose + progress (configure AFTER this)
     if (!cyclic) {
       anim.progress = pose;
-      anim.update(viewer.playerObject, 0); // settle into the pose once
+      anim.update(viewer.playerObject, 0); // settle into the held pose once
     }
+
+    // The name tag is a sprite on playerWrapper; set it last so the animation
+    // assignment above doesn't clobber its position. renderPaused skips the
+    // draw loop, so we rely on the setter's default y-offset for placement.
+    if (showNametag) {
+      const tag = new sv.NameTagObject(username, {
+        font: "48px Monocraft",
+        repaintAfterLoaded: true,
+      });
+      viewer.nameTag = tag;
+      await tag.painted; // wait for the pixel font before capturing
+    }
+
+    // Orbit spins the wrapper (keeping the centred name tag fixed); the flip
+    // easter-egg spins the player itself. They compose independently.
+    const orbitTo = (turn: number) => {
+      if (orbit) viewer.playerWrapper.rotation.y = turn;
+    };
     const flip = () => {
       if (upsideDown) viewer.playerObject.rotation.z = Math.PI;
     };
@@ -193,14 +237,17 @@ export async function generateGif(opts: GifOptions): Promise<Blob> {
     capture.height = size;
     const ctx = capture.getContext("2d", { willReadFrequently: true })!;
 
+    // A held pose with no orbit is a still image — one frame is enough.
+    const animated = cyclic || orbit;
+    const frameCount = animated ? frames : 1;
+
     const rgbaFrames: Uint8ClampedArray[] = [];
-    for (let i = 0; i < frames; i++) {
+    for (let i = 0; i < frameCount; i++) {
       if (cyclic) {
-        anim.progress = cycleProgressForFrame(i, frames, cycle);
+        anim.progress = cycleProgressForFrame(i, frameCount, WALK_CYCLE);
         anim.update(viewer.playerObject, 0);
-      } else {
-        viewer.playerObject.rotation.y = orbitRotationForFrame(i, frames);
       }
+      orbitTo(orbitRotationForFrame(i, frameCount));
       flip(); // keep the easter-egg flip stable across frames
       viewer.render();
 
@@ -208,7 +255,7 @@ export async function generateGif(opts: GifOptions): Promise<Blob> {
       ctx.drawImage(viewer.canvas, 0, 0, size, size);
       rgbaFrames.push(ctx.getImageData(0, 0, size, size).data);
 
-      onProgress?.((i + 1) / frames / 2); // capture is the first half
+      onProgress?.((i + 1) / frameCount / 2); // capture is the first half
       await yieldToUi();
     }
 
@@ -218,7 +265,11 @@ export async function generateGif(opts: GifOptions): Promise<Blob> {
       background,
       onProgress: (f) => onProgress?.(0.5 + f / 2),
     });
-    return new Blob([bytes], { type: "image/gif" });
+    // TS 5.7+ types `Uint8Array` as generic over its buffer (`ArrayBufferLike`,
+    // which includes SharedArrayBuffer), but DOM's `BlobPart` wants a plain
+    // `ArrayBuffer`. gifenc only ever returns a regular ArrayBuffer at runtime,
+    // so the cast is safe.
+    return new Blob([bytes as BlobPart], { type: "image/gif" });
   } finally {
     viewer.dispose();
   }

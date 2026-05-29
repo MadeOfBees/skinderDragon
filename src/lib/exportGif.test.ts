@@ -12,6 +12,8 @@ import {
   pickTransparentIndex,
   encodeFramesToGif,
 } from "./exportGif";
+// Shared with the headless smoke so the GIF byte-parsing lives in one place.
+import { analyzeGif } from "../../scripts/analyze-gif.mjs";
 
 describe("frame math", () => {
   it("walk progress spans exactly one limb cycle across the loop", () => {
@@ -38,19 +40,6 @@ describe("encoder helpers", () => {
     expect(pickTransparentIndex([[1, 2, 3], [9, 9, 9]])).toBe(-1);
   });
 });
-
-/** Minimal GIF byte inspector (header / loop / transparency flag). */
-function analyzeGif(bytes: Uint8Array) {
-  const header = String.fromCharCode(...bytes.slice(0, 6));
-  const txt = String.fromCharCode(...bytes.slice(0, 256));
-  let transparent = false;
-  for (let i = 0; i + 3 < bytes.length; i++) {
-    if (bytes[i] === 0x21 && bytes[i + 1] === 0xf9 && bytes[i + 2] === 0x04) {
-      if (bytes[i + 3] & 0x01) transparent = true;
-    }
-  }
-  return { header, looping: txt.includes("NETSCAPE2.0"), transparent };
-}
 
 function solidFrame(size: number): Uint8ClampedArray {
   const data = new Uint8ClampedArray(size * size * 4);

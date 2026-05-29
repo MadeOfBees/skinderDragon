@@ -3,7 +3,7 @@
 // On a successful search we render the player's head (see `renderHead`) and use
 // it as the favicon, remembering it in localStorage so the next visit opens with
 // that player's face already in the tab. With nothing stored, the static Steve
-// face from `public/favicon.png` (declared in index.html) shows by default.
+// face from `public/favicon.png` (declared in index.html, downloaded by `npm run assets:ensure`) shows by default.
 
 const KEY_NAME = "skinderdragon:lastUsername";
 const KEY_HEAD = "skinderdragon:lastHead";

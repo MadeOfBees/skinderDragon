@@ -1,0 +1,72 @@
+name: CI
+
+# Automated verification on every push and PR:
+#   • checks — fast, hermetic typecheck + unit tests + build (no browser).
+#   • smoke  — the real-skin headless browser WebGL→GIF pipeline.
+#
+# DRY: the smoke job runs the SAME `npm run smoke` you run locally
+# (scripts/smoke-local.mjs: build → serve → scripts/smoke.mjs → clean up), so the
+# build/serve/test orchestration lives in exactly one place. CI only adds the
+# environment-specific bit — provisioning + caching the Playwright browser.
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch: {}
+
+# Only keep the latest run per branch/PR; cancel superseded ones to save minutes.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Typecheck, unit tests, build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run verify
+      - run: npm run build
+
+  smoke:
+    name: Headless browser smoke
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+
+      # Cache the Playwright browser so we don't re-download it every run. Keyed
+      # on the playwright version pinned in the lockfile.
+      - name: Resolve Playwright version
+        id: pw
+        run: echo "version=$(node -p "require('playwright/package.json').version")" >> "$GITHUB_OUTPUT"
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      # Same turnkey command as local: builds, serves the build, runs the smoke,
+      # tears the server down. Runners have no GPU, so pin CPU/SwiftShader to
+      # skip the GPU probe and stay deterministic.
+      - run: npm run smoke
+        env:
+          SMOKE_RENDERER: cpu
+      - name: Upload failure screenshot
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-failure
+          path: scripts/smoke-*.png
+          if-no-files-found: ignore

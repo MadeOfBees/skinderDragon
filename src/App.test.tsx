@@ -26,7 +26,6 @@ vi.mock("skinview3d", () => {
   return {
     SkinViewer,
     WalkingAnimation: Anim,
-    WaveAnimation: Anim,
     CrouchAnimation: Anim,
     FlyingAnimation: Anim,
     NameTagObject: class {
@@ -65,6 +64,7 @@ async function loadUser(name: string) {
 beforeEach(() => {
   vi.mocked(fetchProfile).mockReset();
   vi.mocked(generateGif).mockReset();
+  localStorage.clear(); // keep persisted settings (e.g. panorama) from leaking
 });
 
 describe("<App>", () => {
@@ -128,22 +128,60 @@ describe("<App>", () => {
     );
   });
 
-  it("honors the orbit + transparent selections", async () => {
+  it("layers the orbit toggle onto a mode and honors transparency", async () => {
     vi.mocked(fetchProfile).mockResolvedValue(profile);
     vi.mocked(generateGif).mockResolvedValue(new Blob(["gif"], { type: "image/gif" }));
     render(<App />);
     await loadUser("EthosLab");
     await screen.findByText("EthosLab");
 
+    // Orbit is a modifier now: the mode stays "run" but orbit flips on.
     await userEvent.click(screen.getByRole("button", { name: /orbit/i }));
     await userEvent.click(screen.getByRole("button", { name: /transparent/i }));
     await userEvent.click(screen.getByRole("button", { name: /generate gif/i }));
 
     expect(generateGif).toHaveBeenCalledWith(
-      expect.objectContaining({ mode: "orbit", background: { kind: "transparent" } })
+      expect.objectContaining({
+        mode: "run",
+        orbit: true,
+        background: { kind: "transparent" },
+      })
     );
     const link = await screen.findByRole("link", { name: /download/i });
-    expect(link).toHaveAttribute("download", "EthosLab-orbit.gif");
+    expect(link).toHaveAttribute("download", "EthosLab-run-orbit.gif");
+  });
+
+  it("toggles the nametag and passes it through to the generator", async () => {
+    vi.mocked(fetchProfile).mockResolvedValue(profile);
+    vi.mocked(generateGif).mockResolvedValue(new Blob(["gif"], { type: "image/gif" }));
+    render(<App />);
+    await loadUser("EthosLab");
+    await screen.findByText("EthosLab");
+
+    // Off by default; one click turns it on.
+    await userEvent.click(screen.getByRole("button", { name: /nametag/i }));
+    await userEvent.click(screen.getByRole("button", { name: /generate gif/i }));
+
+    expect(generateGif).toHaveBeenCalledWith(
+      expect.objectContaining({ showNametag: true, username: "EthosLab" })
+    );
+  });
+
+  it("opens settings and switches the panorama source", async () => {
+    render(<App />);
+    expect(screen.queryByTestId("settings")).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByTestId("open-settings"));
+    expect(await screen.findByTestId("settings")).toBeInTheDocument();
+    // Release is the default selection.
+    expect(screen.getByTestId("panorama-release")).toHaveAttribute("aria-pressed", "true");
+
+    await userEvent.click(screen.getByTestId("panorama-snapshot"));
+    expect(screen.getByTestId("panorama-snapshot")).toHaveAttribute("aria-pressed", "true");
+    expect(localStorage.getItem("skinderdragon:panoramaSource")).toBe("snapshot");
+
+    await userEvent.click(screen.getByRole("button", { name: /done/i }));
+    expect(screen.queryByTestId("settings")).not.toBeInTheDocument();
   });
 
   it("shows the color picker only for the solid background", async () => {

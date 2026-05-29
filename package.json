@@ -4,14 +4,16 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "npm run assets:ensure && vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "test:e2e": "node scripts/smoke.mjs",
-    "panorama:refresh": "node scripts/refresh-panorama.mjs"
+    "smoke": "node scripts/smoke-local.mjs",
+    "verify": "tsc --noEmit && vitest run",
+    "assets:refresh": "node scripts/refresh-assets.mjs",
+    "assets:ensure": "node scripts/refresh-assets.mjs --ensure"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.0",

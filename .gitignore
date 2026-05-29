@@ -12,6 +12,10 @@ dist
 dist-ssr
 *.local
 
+# Static assets fetched from Mojang's CDN — run `npm run assets:refresh`
+public/panorama/
+public/favicon.png
+
 # Test / coverage artifacts
 coverage
 scripts/smoke-screenshot.png

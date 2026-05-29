@@ -1,4 +1,4 @@
-# 🐉 skinderdragon
+# skinderdragon
 
 Turn a Minecraft username into a looping skin GIF. Type a name, and skinderdragon
 renders that player's skin **and cape** on a 3D model, then exports a seamless

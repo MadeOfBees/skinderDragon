@@ -26,6 +26,12 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
+      # Panorama faces + default favicon are gitignored (fetched from Mojang's
+      # CDN, never committed), so the runner has none. Download them before the
+      # build copies public/ into dist/. Uses assets:refresh (not :ensure) so a
+      # CDN failure fails the deploy loudly instead of shipping a broken site.
+      - name: Fetch Mojang assets (panorama faces + default favicon)
+        run: npm run assets:refresh
       - name: Build
         run: npm run build
         # Serve from /<repo>/ on project Pages sites; derived automatically.

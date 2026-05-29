@@ -135,9 +135,29 @@ body {
   font-size: 1.15rem;
   padding: 0.85rem 1rem;
 }
+/* Square icon button (gear, close, …): fixed box + centred glyph so the button
+   is square regardless of the glyph's intrinsic width. */
 .mc-btn-icon {
-  font-size: 0.9rem;
-  padding: 0.4rem 0.55rem;
+  display: inline-grid;
+  place-items: center;
+  width: 2.3rem;
+  height: 2.3rem;
+  padding: 0;
+  font-size: 1.15rem;
+  line-height: 1;
+}
+/* The settings gear sits alone in the corner, so make it a bit larger. */
+.mc-btn-gear {
+  width: 2.85rem;
+  height: 2.85rem;
+}
+/* SVG icon: an actual vector centres exactly (unlike an emoji glyph, whose font
+   metrics leave it sitting low). The grid centres the box; the hard drop-shadow
+   matches Minecraft's text shadow on the other buttons. */
+.mc-btn-icon svg {
+  width: 1.6rem;
+  height: 1.6rem;
+  filter: drop-shadow(0.08em 0.08em 0 rgba(0, 0, 0, 0.5));
 }
 
 /* ── Recessed inventory slot ──────────────────────────────────────────────── */
@@ -255,6 +275,36 @@ body {
   }
   to {
     transform: translateX(0);
+  }
+}
+
+/* ── Settings dialog (Ore UI "Options" screen) ────────────────────────────── */
+.mc-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(2px);
+}
+.mc-modal {
+  width: 100%;
+  max-width: 26rem;
+  padding: 1rem 1.1rem 1.1rem;
+}
+.mc-dialog-in {
+  animation: mc-dialog-in 0.16s ease-out;
+}
+@keyframes mc-dialog-in {
+  from {
+    transform: translateY(8px) scale(0.98);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0) scale(1);
+    opacity: 1;
   }
 }
 
