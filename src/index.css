@@ -1,0 +1,289 @@
+@import "tailwindcss";
+
+@font-face {
+  font-family: "Monocraft";
+  src: url("./assets/fonts/Monocraft.ttf") format("truetype");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@theme {
+  --color-bg: #0b0b0d;
+  --color-panel: #313436; /* Ore UI dark panel */
+  --color-panel-2: #3f4346;
+  --color-ink: #ffffff;
+  --color-muted: #b9bdc9;
+  --color-grass: #5b8731;
+  --color-grass-bright: #6cc349;
+  --color-stone: #6e7073;
+  --color-splash: #ffff55;
+
+  --font-mc: "Monocraft", ui-monospace, "Courier New", monospace;
+}
+
+html {
+  background: var(--color-bg);
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: transparent;
+  color: var(--color-ink);
+  font-family: var(--font-mc);
+  /* Minecraft's signature 1px(-scaled) hard text drop-shadow on everything. */
+  text-shadow: 0.09em 0.09em 0 rgba(0, 0, 0, 0.55);
+  -webkit-font-smoothing: none;
+}
+
+/* ── Rotating panorama background ─────────────────────────────────────────── */
+.panorama {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  background: var(--color-bg);
+}
+.panorama-strip {
+  display: flex;
+  height: 100%;
+  width: max-content;
+  transform-origin: left center;
+  will-change: transform;
+  filter: blur(3px) brightness(0.5) saturate(1.15);
+  animation: mc-pan 90s linear infinite;
+}
+.panorama-strip img {
+  height: 100%;
+  width: auto;
+  display: block;
+}
+.panorama::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0.55));
+}
+@keyframes mc-pan {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(calc(-400vh));
+  }
+}
+
+/* ── Logo-style title + splash ────────────────────────────────────────────── */
+.mc-title {
+  font-family: var(--font-mc);
+  margin: 0;
+  line-height: 1.05;
+  color: #fff;
+  /* Stacked hard shadows give the chunky extruded-logo depth. */
+  text-shadow: 3px 3px 0 #2a2a2a, 5px 5px 0 rgba(0, 0, 0, 0.5);
+}
+.mc-splash {
+  font-family: var(--font-mc);
+  color: var(--color-splash);
+  text-shadow: 0.1em 0.1em 0 #3f3f00;
+  transform: rotate(-15deg);
+  transform-origin: center;
+  animation: mc-splash 0.8s ease-in-out infinite alternate;
+}
+@keyframes mc-splash {
+  from {
+    transform: rotate(-15deg) scale(1);
+  }
+  to {
+    transform: rotate(-15deg) scale(1.07);
+  }
+}
+
+/* ── Ore UI dark panel ────────────────────────────────────────────────────── */
+.mc-panel {
+  background: color-mix(in srgb, var(--color-panel) 92%, transparent);
+  border: 2px solid #000;
+  box-shadow: inset 2px 2px 0 rgba(255, 255, 255, 0.09),
+    inset -2px -3px 0 rgba(0, 0, 0, 0.45);
+}
+
+/* ── Nine-slice bevel buttons (Ore UI hierarchy) ──────────────────────────── */
+.mc-btn {
+  font-family: var(--font-mc);
+  font-size: 0.95rem;
+  color: #fff;
+  background: var(--color-stone);
+  border: 2px solid #000;
+  border-radius: 0;
+  padding: 0.6rem 0.85rem;
+  cursor: pointer;
+  user-select: none;
+  text-shadow: 0.09em 0.09em 0 rgba(0, 0, 0, 0.5);
+  box-shadow: inset 2px 2px 0 rgba(255, 255, 255, 0.28),
+    inset -2px -3px 0 rgba(0, 0, 0, 0.4);
+  transition: filter 0.08s;
+}
+.mc-btn:hover:not(:disabled) {
+  filter: brightness(1.15);
+}
+.mc-btn:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+.mc-btn:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow: inset 2px 3px 0 rgba(0, 0, 0, 0.35);
+}
+.mc-btn:disabled {
+  filter: grayscale(0.4) brightness(0.7);
+  cursor: default;
+}
+.mc-btn-green {
+  background: var(--color-grass);
+}
+.mc-btn-stone {
+  background: var(--color-stone);
+}
+.mc-btn-hero {
+  font-size: 1.15rem;
+  padding: 0.85rem 1rem;
+}
+.mc-btn-icon {
+  font-size: 0.9rem;
+  padding: 0.4rem 0.55rem;
+}
+
+/* ── Recessed inventory slot ──────────────────────────────────────────────── */
+.mc-slot {
+  background: #1b1c1f;
+  border: 2px solid #000;
+  border-radius: 0;
+  box-shadow: inset 2px 2px 0 rgba(0, 0, 0, 0.6),
+    inset -2px -2px 0 rgba(255, 255, 255, 0.12);
+  position: relative;
+}
+.mc-slot-hover::after {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  background: #fff;
+  opacity: 0;
+  transition: opacity 0.1s;
+  pointer-events: none;
+}
+.mc-slot-hover:hover::after {
+  opacity: 0.2;
+}
+
+/* ── Text field ───────────────────────────────────────────────────────────── */
+.mc-input {
+  font-family: var(--font-mc);
+  background: #000;
+  color: #e8e8e8;
+  border: 2px solid #a0a0a0;
+  border-radius: 0;
+  padding: 0.6rem 0.7rem;
+  outline: none;
+  text-shadow: 0.09em 0.09em 0 rgba(0, 0, 0, 0.6);
+}
+.mc-input::placeholder {
+  color: #7a7a7a;
+}
+.mc-input:focus {
+  border-color: var(--color-grass-bright);
+}
+
+/* ── XP-bar progress ──────────────────────────────────────────────────────── */
+.mc-xp {
+  height: 14px;
+  background: #0a0a0a;
+  border: 2px solid #000;
+  border-radius: 0;
+  overflow: hidden;
+}
+.mc-xp-fill {
+  height: 100%;
+  background: var(--color-grass-bright);
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.35),
+    inset 0 -3px 0 rgba(0, 0, 0, 0.3);
+  transition: width 0.1s linear;
+}
+
+/* ── Tag chip (cape, etc.) ────────────────────────────────────────────────── */
+.mc-tag {
+  font-family: var(--font-mc);
+  font-size: 0.6rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #fff;
+  background: var(--color-grass);
+  border: 2px solid #000;
+  padding: 1px 6px;
+  box-shadow: inset 1px 1px 0 rgba(255, 255, 255, 0.3),
+    inset -1px -2px 0 rgba(0, 0, 0, 0.35);
+}
+
+/* ── Minecraft tooltip (dark, purple-bordered) ────────────────────────────── */
+.mc-tooltip {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  transform: translateX(-50%);
+  background: rgba(16, 0, 16, 0.94);
+  border: 2px solid transparent;
+  border-image: linear-gradient(#5000ff, #28007f) 1;
+  color: #fff;
+  padding: 6px 9px;
+  font-size: 0.72rem;
+  line-height: 1.5;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.1s;
+  z-index: 50;
+}
+.mc-tooltip-host:hover .mc-tooltip {
+  opacity: 1;
+}
+
+/* ── Advancement toast ────────────────────────────────────────────────────── */
+.mc-toast {
+  position: fixed;
+  top: 18px;
+  right: 18px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: linear-gradient(#2b2b2b, #202020);
+  border: 2px solid #000;
+  box-shadow: inset 2px 2px 0 rgba(255, 255, 255, 0.08),
+    inset -2px -2px 0 rgba(0, 0, 0, 0.5);
+  padding: 8px 12px;
+  z-index: 60;
+  animation: mc-toast-in 0.35s ease-out;
+}
+@keyframes mc-toast-in {
+  from {
+    transform: translateX(120%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.pixelated {
+  image-rendering: pixelated;
+}
+
+/* Transparency indicator behind the model preview and exported GIF. */
+@utility checkerboard {
+  background-color: #2a2d44;
+  background-image: linear-gradient(45deg, #22243a 25%, transparent 25%),
+    linear-gradient(-45deg, #22243a 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #22243a 75%),
+    linear-gradient(-45deg, transparent 75%, #22243a 75%);
+  background-size: 20px 20px;
+  background-position: 0 0, 0 10px, 10px -10px, -10px 0;
+}
