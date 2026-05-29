@@ -1,5 +1,4 @@
 import { useEffect } from "react";
-import { playChime } from "../lib/sound";
 
 interface ToastProps {
   /** The advancement title; the toast is shown while this is non-null. */
@@ -13,7 +12,6 @@ interface ToastProps {
 export function Toast({ message, headUrl, onDismiss }: ToastProps) {
   useEffect(() => {
     if (!message) return;
-    playChime();
     const id = setTimeout(onDismiss, 4500);
     return () => clearTimeout(id);
   }, [message, onDismiss]);

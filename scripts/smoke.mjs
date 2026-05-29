@@ -99,8 +99,8 @@ try {
   check("WebGL available", webgl);
 
   // --- Skin without a cape ---
-  await loadUser("Notch");
-  check("loaded Notch", true);
+  await loadUser("EthosLab");
+  check("loaded EthosLab", true);
 
   const runSolid = await generate({ mode: "run", transparent: false });
   check("run + solid → valid looping GIF", runSolid.valid && runSolid.looping, JSON.stringify(runSolid));

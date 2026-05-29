@@ -1,7 +1,10 @@
 import { GIFEncoder, quantize, applyPalette, type PixelFormat } from "gifenc";
 import { loadSkinview3d } from "./skinview";
 
-export type AnimationMode = "run" | "orbit";
+export type AnimationMode = "run" | "orbit" | "wave" | "sneak" | "fly";
+
+/** Modes that animate the limbs in place (a seamless loop), vs. orbit a pose. */
+const CYCLE_MODES = new Set<AnimationMode>(["run", "wave"]);
 
 export type Background =
   | { kind: "transparent" }
@@ -13,6 +16,8 @@ export interface GifOptions {
   slim: boolean;
   mode: AnimationMode;
   background: Background;
+  /** Render the player flipped (the Dinnerbone/Grumm easter egg). */
+  upsideDown?: boolean;
   /** Output is a square of this many pixels. @default 512 */
   size?: number;
   /** Number of frames in the loop. @default 30 */
@@ -29,6 +34,18 @@ export interface GifOptions {
 export const WALK_CYCLE = Math.PI / 4;
 // Mid-stride pose (sin peak → maximum limb extension) for the frozen orbit.
 export const FROZEN_PROGRESS = Math.PI / 16;
+// WaveAnimation drives the arm with sin(progress * π); one full wave spans a
+// progress interval of 2 — looping over it yields a seamless wave.
+export const WAVE_CYCLE = 2;
+// Progress values at which the (non-cyclic) crouch/fly animations have settled
+// into their pose, so we can freeze them and orbit the camera around the pose.
+export const SNEAK_POSE = 1;
+export const FLY_POSE = 2;
+
+/** Walk-animation progress for frame `i` of `frames` of a given cycle length. */
+function cycleProgressForFrame(i: number, frames: number, cycle: number): number {
+  return (i / frames) * cycle;
+}
 
 /** Walk-animation progress for frame `i` of `frames` (one seamless cycle). */
 export function walkProgressForFrame(i: number, frames: number): number {
@@ -95,8 +112,35 @@ export async function encodeFramesToGif(
 }
 
 /**
- * Renders a Minecraft player to a seamless looping GIF, either running in
- * place or frozen mid-stride while the camera orbits.
+ * Builds the animation for a given mode and reports how to drive it: either a
+ * seamless limb cycle (run/wave) or a frozen pose the camera orbits (orbit/
+ * sneak/fly).
+ */
+function buildAnimation(
+  sv: Awaited<ReturnType<typeof loadSkinview3d>>,
+  mode: AnimationMode
+): { anim: InstanceType<typeof sv.PlayerAnimation>; cycle: number; pose: number } {
+  switch (mode) {
+    case "wave":
+      return { anim: new sv.WaveAnimation(), cycle: WAVE_CYCLE, pose: 0 };
+    case "sneak":
+      return { anim: new sv.CrouchAnimation(), cycle: 0, pose: SNEAK_POSE };
+    case "fly":
+      return { anim: new sv.FlyingAnimation(), cycle: 0, pose: FLY_POSE };
+    case "orbit":
+    case "run":
+    default: {
+      const anim = new sv.WalkingAnimation();
+      anim.headBobbing = false; // long-period head bob would break the short loop
+      return { anim, cycle: WALK_CYCLE, pose: FROZEN_PROGRESS };
+    }
+  }
+}
+
+/**
+ * Renders a Minecraft player to a seamless looping GIF. Cyclic modes (run, wave)
+ * animate the limbs in place; posed modes (orbit, sneak, fly) freeze the pose
+ * and orbit the camera around it.
  */
 export async function generateGif(opts: GifOptions): Promise<Blob> {
   const {
@@ -105,15 +149,16 @@ export async function generateGif(opts: GifOptions): Promise<Blob> {
     slim,
     mode,
     background,
+    upsideDown = false,
     size = 512,
     frames = 30,
     fps = 12,
     onProgress,
   } = opts;
 
-  const { SkinViewer, WalkingAnimation } = await loadSkinview3d();
+  const sv = await loadSkinview3d();
   const canvas = document.createElement("canvas");
-  const viewer = new SkinViewer({
+  const viewer = new sv.SkinViewer({
     canvas,
     width: size,
     height: size,
@@ -130,14 +175,18 @@ export async function generateGif(opts: GifOptions): Promise<Blob> {
     await viewer.loadSkin(skinUrl, { model: slim ? "slim" : "default" });
     if (capeUrl) await viewer.loadCape(capeUrl);
 
-    const anim = new WalkingAnimation();
-    anim.headBobbing = false; // long-period head bob would break the short loop
+    const { anim, cycle, pose } = buildAnimation(sv, mode);
     viewer.animation = anim;
 
-    if (mode === "orbit") {
-      anim.progress = FROZEN_PROGRESS;
-      anim.update(viewer.playerObject, 0); // freeze the pose once
+    const cyclic = CYCLE_MODES.has(mode);
+    if (!cyclic) {
+      anim.progress = pose;
+      anim.update(viewer.playerObject, 0); // settle into the pose once
     }
+    const flip = () => {
+      if (upsideDown) viewer.playerObject.rotation.z = Math.PI;
+    };
+    flip();
 
     const capture = document.createElement("canvas");
     capture.width = size;
@@ -146,12 +195,13 @@ export async function generateGif(opts: GifOptions): Promise<Blob> {
 
     const rgbaFrames: Uint8ClampedArray[] = [];
     for (let i = 0; i < frames; i++) {
-      if (mode === "run") {
-        anim.progress = walkProgressForFrame(i, frames);
+      if (cyclic) {
+        anim.progress = cycleProgressForFrame(i, frames, cycle);
         anim.update(viewer.playerObject, 0);
       } else {
         viewer.playerObject.rotation.y = orbitRotationForFrame(i, frames);
       }
+      flip(); // keep the easter-egg flip stable across frames
       viewer.render();
 
       ctx.clearRect(0, 0, size, size);

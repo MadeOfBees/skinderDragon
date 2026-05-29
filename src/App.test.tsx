@@ -1,26 +1,38 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
+import "@testing-library/jest-dom";
 import userEvent from "@testing-library/user-event";
 
 // skinview3d needs WebGL, which jsdom lacks — stub it with inert classes.
 vi.mock("skinview3d", () => {
   class SkinViewer {
     controls = { enablePan: true };
-    playerObject = { rotation: { y: 0 } };
+    playerObject = { rotation: { y: 0, z: 0 } };
     autoRotate = false;
     animation: unknown = null;
+    nameTag: unknown = null;
     loadSkin = vi.fn().mockResolvedValue(undefined);
     loadCape = vi.fn().mockResolvedValue(undefined);
     dispose = vi.fn();
     constructor(_opts: unknown) {}
   }
-  class WalkingAnimation {
+  class Anim {
     headBobbing = true;
     progress = 0;
     paused = false;
     update = vi.fn();
+    constructor(..._args: unknown[]) {}
   }
-  return { SkinViewer, WalkingAnimation };
+  return {
+    SkinViewer,
+    WalkingAnimation: Anim,
+    WaveAnimation: Anim,
+    CrouchAnimation: Anim,
+    FlyingAnimation: Anim,
+    NameTagObject: class {
+      constructor(..._args: unknown[]) {}
+    },
+  };
 });
 
 vi.mock("./lib/profile", () => ({
@@ -39,7 +51,7 @@ import { generateGif } from "./lib/exportGif";
 
 const profile = {
   uuid: "u",
-  username: "Notch",
+  username: "EthosLab",
   slim: false,
   skinUrl: "blob:skin",
   capeUrl: null as string | null,
@@ -66,11 +78,11 @@ describe("<App>", () => {
   it("loads a skin and shows the player without a cape badge", async () => {
     vi.mocked(fetchProfile).mockResolvedValue(profile);
     render(<App />);
-    await loadUser("Notch");
+    await loadUser("EthosLab");
 
-    expect(fetchProfile).toHaveBeenCalledWith("Notch");
-    expect(await screen.findByText("Notch")).toBeInTheDocument();
-    expect(screen.queryByText("cape")).not.toBeInTheDocument();
+    expect(fetchProfile).toHaveBeenCalledWith("EthosLab");
+    expect(await screen.findByText("EthosLab")).toBeInTheDocument();
+    expect(screen.queryByTestId("cape-badge")).not.toBeInTheDocument();
   });
 
   it("shows a cape badge when the player has a cape", async () => {
@@ -83,7 +95,7 @@ describe("<App>", () => {
     await loadUser("jeb_");
 
     expect(await screen.findByText("jeb_")).toBeInTheDocument();
-    expect(screen.getByText("cape")).toBeInTheDocument();
+    expect(screen.getByTestId("cape-badge")).toBeInTheDocument();
   });
 
   it("surfaces a friendly error for unknown players", async () => {
@@ -100,13 +112,13 @@ describe("<App>", () => {
     vi.mocked(fetchProfile).mockResolvedValue(profile);
     vi.mocked(generateGif).mockResolvedValue(new Blob(["gif"], { type: "image/gif" }));
     render(<App />);
-    await loadUser("Notch");
-    await screen.findByText("Notch");
+    await loadUser("EthosLab");
+    await screen.findByText("EthosLab");
 
     await userEvent.click(screen.getByRole("button", { name: /generate gif/i }));
 
     const link = await screen.findByRole("link", { name: /download gif/i });
-    expect(link).toHaveAttribute("download", "Notch-run.gif");
+    expect(link).toHaveAttribute("download", "EthosLab-run.gif");
     expect(generateGif).toHaveBeenCalledWith(
       expect.objectContaining({
         mode: "run",
@@ -120,8 +132,8 @@ describe("<App>", () => {
     vi.mocked(fetchProfile).mockResolvedValue(profile);
     vi.mocked(generateGif).mockResolvedValue(new Blob(["gif"], { type: "image/gif" }));
     render(<App />);
-    await loadUser("Notch");
-    await screen.findByText("Notch");
+    await loadUser("EthosLab");
+    await screen.findByText("EthosLab");
 
     await userEvent.click(screen.getByRole("button", { name: /orbit/i }));
     await userEvent.click(screen.getByRole("button", { name: /transparent/i }));
@@ -131,14 +143,14 @@ describe("<App>", () => {
       expect.objectContaining({ mode: "orbit", background: { kind: "transparent" } })
     );
     const link = await screen.findByRole("link", { name: /download/i });
-    expect(link).toHaveAttribute("download", "Notch-orbit.gif");
+    expect(link).toHaveAttribute("download", "EthosLab-orbit.gif");
   });
 
   it("shows the color picker only for the solid background", async () => {
     vi.mocked(fetchProfile).mockResolvedValue(profile);
     render(<App />);
-    await loadUser("Notch");
-    await screen.findByText("Notch");
+    await loadUser("EthosLab");
+    await screen.findByText("EthosLab");
 
     expect(screen.getByText("#1d2030")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: /transparent/i }));

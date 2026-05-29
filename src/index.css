@@ -46,33 +46,18 @@ body {
   overflow: hidden;
   background: var(--color-bg);
 }
-.panorama-strip {
-  display: flex;
-  height: 100%;
-  width: max-content;
-  transform-origin: left center;
-  will-change: transform;
-  filter: blur(3px) brightness(0.5) saturate(1.15);
-  animation: mc-pan 90s linear infinite;
-}
-.panorama-strip img {
-  height: 100%;
-  width: auto;
+.panorama-canvas {
   display: block;
+  width: 100%;
+  height: 100%;
+  /* Soften + dim the live cubemap so it reads as ambient menu background. */
+  filter: blur(3px) brightness(0.5) saturate(1.15);
 }
 .panorama::after {
   content: "";
   position: absolute;
   inset: 0;
   background: linear-gradient(rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0.55));
-}
-@keyframes mc-pan {
-  from {
-    transform: translateX(0);
-  }
-  to {
-    transform: translateX(calc(-400vh));
-  }
 }
 
 /* ── Logo-style title + splash ────────────────────────────────────────────── */
