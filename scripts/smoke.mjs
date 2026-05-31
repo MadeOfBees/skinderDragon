@@ -114,17 +114,17 @@ async function loadUser(name) {
   await page.waitForTimeout(2000);
 }
 
-// Orbit / Nametag are toggle buttons (aria-pressed); set them deterministically.
+// Orbit / Nametag are Switch checkboxes inside a <label>; set them deterministically.
 async function setToggle(name, on) {
-  const btn = page.locator(`button[aria-pressed]:has-text("${name}")`).first();
-  const pressed = (await btn.getAttribute("aria-pressed")) === "true";
-  if (pressed !== on) await btn.click();
+  const lbl = page.locator(`label.mc-switch:has-text("${name}")`).first();
+  const checked = await lbl.locator('input[type="checkbox"]').isChecked();
+  if (checked !== on) await lbl.click();
 }
 
 async function generate({ mode = "run", orbit = false, transparent }) {
-  // Animation modes are mutually exclusive buttons (Run / Sneak / Fly).
-  const label = { run: "Run", sneak: "Sneak", fly: "Fly" }[mode];
-  await page.click(`button:has-text("${label}")`);
+  // Mode is a range slider: MODE_ORDER = ["sneak", "run", "fly"] → indices 0/1/2.
+  const modeIndex = { sneak: 0, run: 1, fly: 2 }[mode];
+  await page.locator('input[aria-label="Animation mode"]').fill(String(modeIndex));
   await setToggle("Orbit", orbit);
   await page.click(`button:has-text("${transparent ? "Transparent" : "Solid"}")`);
   await page.click('button:has-text("Generate GIF")');
