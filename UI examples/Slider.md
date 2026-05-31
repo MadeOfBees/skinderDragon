@@ -1,0 +1,1 @@
+The movable square on the slider will change colors when hovered over
