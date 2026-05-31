@@ -1,5 +1,6 @@
 import { useEffect, type ReactNode } from "react";
 import type { PanoramaSource } from "./Panorama";
+import type { Edition } from "../lib/providers";
 import { CloseIcon } from "./CloseIcon";
 import { Multibutton } from "./Multibutton";
 
@@ -29,19 +30,17 @@ export interface SettingsProps {
   onClose: () => void;
   panoramaSource: PanoramaSource;
   onPanoramaSource: (source: PanoramaSource) => void;
+  edition: Edition;
+  onEdition: (edition: Edition) => void;
 }
 
-/**
- * The Minecraft-style "Options" screen: a dark Ore UI panel floating over a
- * dimmed backdrop, holding app-level preferences (currently the title-screen
- * panorama channel). Add future settings as more <SettingRow>s. Closes on the
- * Done button, the ✕, a backdrop click, or Escape.
- */
 export function Settings({
   open,
   onClose,
   panoramaSource,
   onPanoramaSource,
+  edition,
+  onEdition,
 }: SettingsProps) {
   useEffect(() => {
     if (!open) return;
@@ -78,6 +77,17 @@ export function Settings({
         </header>
 
         <div className="mc-modal-body">
+          <SettingRow label="Edition" hint="Which Minecraft edition to search.">
+            <Multibutton
+              options={[
+                { label: "Java", value: "java" as Edition, testId: "edition-java" },
+                { label: "Bedrock", value: "bedrock" as Edition, testId: "edition-bedrock" },
+              ]}
+              value={edition}
+              onChange={onEdition}
+            />
+          </SettingRow>
+
           <SettingRow label="Panorama" hint="Title-screen background source.">
             <Multibutton
               options={[

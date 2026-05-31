@@ -12,7 +12,8 @@ import { Multibutton } from "./components/Multibutton";
 import { usePreview } from "./hooks/usePreview";
 import { renderHead, renderCape } from "./lib/head";
 import { loadLastSearch, rememberLastSearch, setFavicon } from "./lib/favicon";
-import { loadPanoramaSource, savePanoramaSource } from "./lib/settings";
+import { loadPanoramaSource, savePanoramaSource, loadEdition, saveEdition } from "./lib/settings";
+import type { Edition } from "./lib/providers";
 import { randomSplash } from "./data/splashes";
 
 const MODE_ORDER: AnimationMode[] = ["sneak", "run", "fly"];
@@ -54,6 +55,7 @@ export function App() {
 
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [panoramaSource, setPanoramaSource] = useState<PanoramaSource>(loadPanoramaSource);
+  const [edition, setEdition] = useState<Edition>(loadEdition);
 
   const [generating, setGenerating] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -131,6 +133,13 @@ export function App() {
     savePanoramaSource(source);
   }, []);
 
+  const changeEdition = useCallback((ed: Edition) => {
+    setEdition(ed);
+    saveEdition(ed);
+    setProfile(null);
+    setError(null);
+  }, []);
+
   async function onSubmit(e: SyntheticEvent) {
     e.preventDefault();
     if (loading) return;
@@ -139,7 +148,7 @@ export function App() {
     setGifUrl(null);
     setGifModalOpen(false);
     try {
-      setProfile(await fetchProfile(username));
+      setProfile(await fetchProfile(username, edition));
     } catch (err) {
       setProfile(null);
       setError(
@@ -198,6 +207,8 @@ export function App() {
         onClose={closeSettings}
         panoramaSource={panoramaSource}
         onPanoramaSource={changePanoramaSource}
+        edition={edition}
+        onEdition={changeEdition}
       />
       {profile && (
         <GifModal
@@ -229,7 +240,7 @@ export function App() {
           onChange={setUsername}
           onSubmit={onSubmit}
           disabled={loading}
-          placeholder="Minecraft username"
+          placeholder={edition === "bedrock" ? "Bedrock gamertag" : "Java username"}
           error={error}
           className="mx-auto w-full max-w-md"
         />
@@ -345,11 +356,11 @@ export function App() {
       <footer className="fixed inset-x-0 bottom-0 z-10 flex items-end justify-between gap-3 px-3 py-2 text-[0.7rem] text-muted">
         <span>skinderdragon 1.0 — not affiliated with Mojang</span>
         <span className="text-right">
-          lookup via{" "}
-          <a href="https://playerdb.co">
-            playerdb
-          </a>{" "}
-          · skins from Mojang&apos;s CDN
+          {edition === "bedrock" ? (
+            <>lookup via <a href="https://api.geysermc.org">GeyserMC</a> · skins from Mojang&apos;s CDN</>
+          ) : (
+            <>lookup via <a href="https://playerdb.co">playerdb</a> · skins from Mojang&apos;s CDN</>
+          )}
         </span>
       </footer>
     </>

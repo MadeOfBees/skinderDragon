@@ -1,18 +1,21 @@
-// Resolves a Minecraft username to the official Mojang texture URLs.
+// Resolves a Minecraft username/gamertag to the official Mojang texture URLs.
 //
-// Mojang's own lookup endpoints (api.mojang.com / sessionserver) don't send
-// CORS headers, so a static browser app can't call them directly. We use
-// playerdb.co — a CORS-enabled wrapper that returns Mojang's data unmodified,
-// including the canonical `textures.minecraft.net` URLs. The actual skin/cape
-// PNGs are then downloaded from that official CDN (see `textures.ts`).
+// Java: Mojang's own lookup endpoints don't send CORS headers, so we use
+// playerdb.co — a CORS-enabled wrapper that returns Mojang's data unmodified.
 //
-// This module is the single seam for the data source: swapping playerdb for a
-// generic CORS proxy or a self-hosted worker means changing only `resolveTextures`.
+// Bedrock: Bedrock players use Xbox Live accounts. We use the GeyserMC Global
+// API (api.geysermc.org, CORSPlug/*) to convert a gamertag → XUID → skin.
+// GeyserMC only caches skins for players who have joined a Floodgate/GeyserMC
+// server, so a player who has never done so will return an empty skin response.
+//
+// This module is the single seam for the data source.
+
+export type Edition = "java" | "bedrock";
 
 export interface ResolvedTextures {
-  /** Dashed UUID. */
-  uuid: string;
-  /** Canonical username casing as Mojang stores it. */
+  /** Java UUID (dashed) for Java players; XUID string for Bedrock players. */
+  playerId: string;
+  /** Canonical username / gamertag. */
   username: string;
   /** `true` = slim ("Alex") arms, `false` = classic ("Steve") arms. */
   slim: boolean;
@@ -24,10 +27,14 @@ export interface ResolvedTextures {
 
 export class ProfileError extends Error {}
 
-/** Minecraft usernames: 1–16 of [A-Za-z0-9_]. */
+/** Java usernames: 1–16 of [A-Za-z0-9_]. */
 export const USERNAME_RE = /^[A-Za-z0-9_]{1,16}$/;
 
+/** Xbox gamertags: 1–16 of letters, digits, spaces. */
+export const GAMERTAG_RE = /^[A-Za-z0-9 ]{1,16}$/;
+
 const PLAYERDB = "https://playerdb.co/api/player/minecraft/";
+const GEYSER = "https://api.geysermc.org/v2";
 
 interface PlayerDbResponse {
   success: boolean;
@@ -48,6 +55,15 @@ interface MojangTextures {
     SKIN?: { url: string; metadata?: { model?: string } };
     CAPE?: { url: string };
   };
+}
+
+interface GeyserXuidResponse {
+  xuid?: number;
+}
+
+interface GeyserSkinResponse {
+  value?: string;
+  is_steve?: boolean;
 }
 
 /** Decodes a base64 `textures` property value into its skin/cape URLs + model. */
@@ -71,9 +87,9 @@ export function decodeTexturesProperty(base64Value: string): {
   };
 }
 
-export async function resolveTextures(
+async function resolveJavaTextures(
   rawName: string,
-  fetchImpl: typeof fetch = fetch
+  fetchImpl: typeof fetch
 ): Promise<ResolvedTextures> {
   const name = rawName.trim();
   if (!name) throw new ProfileError("Enter a username.");
@@ -97,9 +113,8 @@ export async function resolveTextures(
     body = null;
   }
 
-  // playerdb answers unknown players with HTTP 400 and success:false.
   if (res.status === 400 || body?.success === false) {
-    throw new ProfileError(`No Minecraft player named “${name}”.`);
+    throw new ProfileError(`No Minecraft player named "${name}".`);
   }
   if (!res.ok || !body?.data?.player) {
     throw new ProfileError(`Lookup failed (HTTP ${res.status}). Try again shortly.`);
@@ -112,10 +127,92 @@ export async function resolveTextures(
   const { skinUrl, capeUrl, slim } = decodeTexturesProperty(texturesProp.value);
 
   return {
-    uuid: player.id,
+    playerId: player.id,
     username: player.username,
     slim,
     skinTextureUrl: skinUrl,
     capeTextureUrl: capeUrl,
   };
+}
+
+async function resolveBedrockTextures(
+  rawName: string,
+  fetchImpl: typeof fetch
+): Promise<ResolvedTextures> {
+  const name = rawName.trim();
+  if (!name) throw new ProfileError("Enter a gamertag.");
+  if (!GAMERTAG_RE.test(name)) {
+    throw new ProfileError(
+      "Gamertags are 1–16 characters: letters, numbers and spaces only."
+    );
+  }
+
+  // Step 1: gamertag → XUID
+  let xuidRes: Response;
+  try {
+    xuidRes = await fetchImpl(`${GEYSER}/xbox/xuid/${encodeURIComponent(name)}`);
+  } catch {
+    throw new ProfileError("Network error — check your connection and try again.");
+  }
+
+  if (!xuidRes.ok) {
+    throw new ProfileError(`No Bedrock player named "${name}".`);
+  }
+
+  let xuidBody: GeyserXuidResponse | null = null;
+  try {
+    xuidBody = (await xuidRes.json()) as GeyserXuidResponse;
+  } catch {
+    xuidBody = null;
+  }
+
+  if (!xuidBody?.xuid) throw new ProfileError(`No Bedrock player named "${name}".`);
+
+  const xuid = xuidBody.xuid;
+
+  // Step 2: XUID → skin (GeyserMC cache; empty if player hasn't joined a Floodgate server)
+  let skinRes: Response;
+  try {
+    skinRes = await fetchImpl(`${GEYSER}/skin/${xuid}`);
+  } catch {
+    throw new ProfileError("Network error — check your connection and try again.");
+  }
+
+  let skinBody: GeyserSkinResponse | null = null;
+  try {
+    skinBody = (await skinRes.json()) as GeyserSkinResponse;
+  } catch {
+    skinBody = null;
+  }
+
+  if (!skinBody?.value) {
+    throw new ProfileError(
+      `"${name}" hasn't joined a GeyserMC server yet — their skin isn't available.`
+    );
+  }
+
+  const { skinUrl, capeUrl } = decodeTexturesProperty(skinBody.value);
+
+  return {
+    playerId: String(xuid),
+    username: name,
+    // GeyserMC's is_steve flag is more reliable than the decoded metadata for Bedrock skins.
+    slim: skinBody.is_steve === false,
+    skinTextureUrl: skinUrl,
+    capeTextureUrl: capeUrl,
+  };
+}
+
+/**
+ * Routes to the Java or Bedrock resolver based on `edition`.
+ * `fetchImpl` defaults to the global `fetch`; pass a mock for tests.
+ */
+export async function resolveTextures(
+  rawName: string,
+  fetchImpl: typeof fetch = fetch,
+  edition: Edition = "java"
+): Promise<ResolvedTextures> {
+  return edition === "bedrock"
+    ? resolveBedrockTextures(rawName, fetchImpl)
+    : resolveJavaTextures(rawName, fetchImpl);
 }

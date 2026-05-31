@@ -58,7 +58,7 @@ import { fetchProfile, ProfileError } from "./lib/profile";
 import { captureViewerGif } from "./lib/exportGif";
 
 const profile = {
-  uuid: "u",
+  playerId: "u",
   username: "EthosLab",
   slim: false,
   skinUrl: "blob:skin",
@@ -89,7 +89,7 @@ describe("<App>", () => {
     render(<App />);
     await loadUser("EthosLab");
 
-    expect(fetchProfile).toHaveBeenCalledWith("EthosLab");
+    expect(fetchProfile).toHaveBeenCalledWith("EthosLab", "java");
     expect(await screen.findByText("EthosLab")).toBeInTheDocument();
     expect(screen.queryByTestId("cape-badge")).not.toBeInTheDocument();
   });

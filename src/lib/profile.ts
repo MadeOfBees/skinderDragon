@@ -1,10 +1,11 @@
-import { resolveTextures, ProfileError } from "./providers";
+import { resolveTextures, ProfileError, type Edition } from "./providers";
 import { fetchAsObjectURL } from "./textures";
 
 export { ProfileError };
 
 export interface MinecraftProfile {
-  uuid: string;
+  /** Java UUID (dashed) for Java; XUID string for Bedrock. */
+  playerId: string;
   username: string;
   /** `true` = slim ("Alex") arms, `false` = classic ("Steve") arms. */
   slim: boolean;
@@ -14,13 +15,11 @@ export interface MinecraftProfile {
   capeUrl: string | null;
 }
 
-/**
- * Resolves a username to a renderable profile: the IDs/model come from Mojang
- * (via playerdb), and the skin/cape images are downloaded from Mojang's
- * official CDN as object URLs so the export canvas stays untainted.
- */
-export async function fetchProfile(rawName: string): Promise<MinecraftProfile> {
-  const resolved = await resolveTextures(rawName);
+export async function fetchProfile(
+  rawName: string,
+  edition: Edition = "java"
+): Promise<MinecraftProfile> {
+  const resolved = await resolveTextures(rawName, fetch, edition);
 
   const skinUrl = await fetchAsObjectURL(resolved.skinTextureUrl);
 
@@ -35,7 +34,7 @@ export async function fetchProfile(rawName: string): Promise<MinecraftProfile> {
   }
 
   return {
-    uuid: resolved.uuid,
+    playerId: resolved.playerId,
     username: resolved.username,
     slim: resolved.slim,
     skinUrl,

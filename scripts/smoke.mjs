@@ -194,6 +194,8 @@ try {
   const capeOrbit = await generate({ mode: "run", orbit: true, transparent: false });
   check("cape + orbit → valid looping GIF", capeOrbit.valid && capeOrbit.looping, JSON.stringify(capeOrbit));
 
+  // Reset orbit so SwiftShader isn't compositing a spinning viewport during screenshot.
+  await setToggle("Orbit", false);
   // Cap the implicit font wait so a slow webfont can't hang the capture.
   await page
     .evaluate(() =>
@@ -203,7 +205,7 @@ try {
   await page.screenshot({
     path: "scripts/smoke-screenshot.png",
     animations: "disabled",
-    timeout: 15000,
+    timeout: 30000,
   });
   check("screenshot saved", true, "scripts/smoke-screenshot.png");
 

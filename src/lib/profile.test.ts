@@ -13,7 +13,7 @@ import { resolveTextures } from "./providers";
 import { fetchAsObjectURL } from "./textures";
 
 const resolved = {
-  uuid: "u",
+  playerId: "u",
   username: "Notch",
   slim: true,
   skinTextureUrl: "https://textures.minecraft.net/texture/skin",
@@ -35,7 +35,7 @@ describe("fetchProfile", () => {
     const profile = await fetchProfile("Notch");
 
     expect(profile).toEqual({
-      uuid: "u",
+      playerId: "u",
       username: "Notch",
       slim: true,
       skinUrl: "blob:skin",
