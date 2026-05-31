@@ -13,10 +13,13 @@ import { chromium } from "playwright";
 import { analyzeGif } from "./analyze-gif.mjs";
 
 const BASE_URL = process.env.SMOKE_URL ?? "http://localhost:5173/";
-// Render tiny GIFs (8 frames @ 256px) instead of the 30×512 default so the
+// Render tiny GIFs (2 frames @ 256px) instead of the 30×512 default so the
 // software-WebGL render — the run's bottleneck — finishes quickly. The encode/
 // validity paths are identical; only the pixel/frame counts shrink.
-const URL = `${BASE_URL}${BASE_URL.includes("?") ? "&" : "?"}gifSize=256&gifFrames=8`;
+// 2 frames samples t=0 and t=0.5 — enough to confirm the frame loop iterates
+// with distinct phases. Each extra frame costs ~6s × 4 animated generates on
+// SwiftShader; 8 frames pushed total rendering past the 45s per-generate timeout.
+const URL = `${BASE_URL}${BASE_URL.includes("?") ? "&" : "?"}gifSize=256&gifFrames=2`;
 
 // Renderer selection. We prefer the real GPU (fast — e.g. ANGLE/Metal on macOS)
 // but fall back to CPU software rendering (SwiftShader) when no usable GPU is

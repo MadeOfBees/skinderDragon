@@ -49,7 +49,7 @@ process.on("SIGINT", () => {
 });
 
 try {
-  await run("npm", ["run", "assets:refresh"]);
+  await run("npm", ["run", "assets:ensure"]);
   await run("npm", ["run", "build"]);
 
   server = spawn("npx", ["vite", "preview", "--port", PORT, "--host", "127.0.0.1"], {
