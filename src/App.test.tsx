@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import userEvent from "@testing-library/user-event";
 
@@ -8,27 +8,34 @@ vi.mock("skinview3d", () => {
   class SkinViewer {
     controls = { enablePan: true };
     playerObject = { rotation: { y: 0, z: 0 } };
-    autoRotate = false;
+    playerWrapper = { rotation: { y: 0, z: 0 } };
+    scene = { add: vi.fn(), remove: vi.fn() };
     animation: unknown = null;
-    nameTag: unknown = null;
     loadSkin = vi.fn().mockResolvedValue(undefined);
     loadCape = vi.fn().mockResolvedValue(undefined);
     dispose = vi.fn();
     constructor(_opts: unknown) {}
   }
   class Anim {
-    headBobbing = true;
     progress = 0;
     paused = false;
     update = vi.fn();
     constructor(..._args: unknown[]) {}
   }
+  class FunctionAnimation extends Anim {
+    constructor(public fn: unknown) {
+      super();
+    }
+  }
   return {
     SkinViewer,
-    WalkingAnimation: Anim,
+    FunctionAnimation,
+    RunningAnimation: Anim,
     CrouchAnimation: Anim,
     FlyingAnimation: Anim,
     NameTagObject: class {
+      position = { y: 0 };
+      painted = Promise.resolve();
       constructor(..._args: unknown[]) {}
     },
   };
@@ -39,14 +46,16 @@ vi.mock("./lib/profile", () => ({
   fetchProfile: vi.fn(),
 }));
 
+// The preview hook captures the GIF straight from the live viewer via
+// captureViewerGif; stub that out (no real WebGL in jsdom).
 vi.mock("./lib/exportGif", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./lib/exportGif")>();
-  return { ...actual, generateGif: vi.fn() };
+  return { ...actual, captureViewerGif: vi.fn() };
 });
 
 import { App } from "./App";
 import { fetchProfile, ProfileError } from "./lib/profile";
-import { generateGif } from "./lib/exportGif";
+import { captureViewerGif } from "./lib/exportGif";
 
 const profile = {
   uuid: "u",
@@ -58,12 +67,12 @@ const profile = {
 
 async function loadUser(name: string) {
   await userEvent.type(screen.getByPlaceholderText(/username/i), name);
-  await userEvent.click(screen.getByRole("button", { name: /load skin/i }));
+  await userEvent.click(screen.getByRole("button", { name: /search/i }));
 }
 
 beforeEach(() => {
   vi.mocked(fetchProfile).mockReset();
-  vi.mocked(generateGif).mockReset();
+  vi.mocked(captureViewerGif).mockReset();
   localStorage.clear(); // keep persisted settings (e.g. panorama) from leaking
 });
 
@@ -110,7 +119,7 @@ describe("<App>", () => {
 
   it("generates a run GIF and offers a correctly-named download", async () => {
     vi.mocked(fetchProfile).mockResolvedValue(profile);
-    vi.mocked(generateGif).mockResolvedValue(new Blob(["gif"], { type: "image/gif" }));
+    vi.mocked(captureViewerGif).mockResolvedValue(new Blob(["gif"], { type: "image/gif" }));
     render(<App />);
     await loadUser("EthosLab");
     await screen.findByText("EthosLab");
@@ -119,10 +128,11 @@ describe("<App>", () => {
 
     const link = await screen.findByRole("link", { name: /download gif/i });
     expect(link).toHaveAttribute("download", "EthosLab-run.gif");
-    expect(generateGif).toHaveBeenCalledWith(
+    expect(captureViewerGif).toHaveBeenCalledWith(
+      expect.anything(), // the live preview viewer
+      expect.anything(), // its current ModeAnimation
       expect.objectContaining({
-        mode: "run",
-        skinUrl: "blob:skin",
+        orbit: false,
         background: { kind: "color", color: "#1d2030" },
       })
     );
@@ -130,19 +140,20 @@ describe("<App>", () => {
 
   it("layers the orbit toggle onto a mode and honors transparency", async () => {
     vi.mocked(fetchProfile).mockResolvedValue(profile);
-    vi.mocked(generateGif).mockResolvedValue(new Blob(["gif"], { type: "image/gif" }));
+    vi.mocked(captureViewerGif).mockResolvedValue(new Blob(["gif"], { type: "image/gif" }));
     render(<App />);
     await loadUser("EthosLab");
     await screen.findByText("EthosLab");
 
-    // Orbit is a modifier now: the mode stays "run" but orbit flips on.
-    await userEvent.click(screen.getByRole("button", { name: /orbit/i }));
+    // Orbit is a modifier: the mode stays "run" but orbit flips on.
+    await userEvent.click(screen.getByRole("checkbox", { name: /orbit/i }));
     await userEvent.click(screen.getByRole("button", { name: /transparent/i }));
     await userEvent.click(screen.getByRole("button", { name: /generate gif/i }));
 
-    expect(generateGif).toHaveBeenCalledWith(
+    expect(captureViewerGif).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
       expect.objectContaining({
-        mode: "run",
         orbit: true,
         background: { kind: "transparent" },
       })
@@ -151,20 +162,38 @@ describe("<App>", () => {
     expect(link).toHaveAttribute("download", "EthosLab-run-orbit.gif");
   });
 
-  it("toggles the nametag and passes it through to the generator", async () => {
+  it("picks a mode from the buttons and names the download for it", async () => {
     vi.mocked(fetchProfile).mockResolvedValue(profile);
-    vi.mocked(generateGif).mockResolvedValue(new Blob(["gif"], { type: "image/gif" }));
+    vi.mocked(captureViewerGif).mockResolvedValue(new Blob(["gif"], { type: "image/gif" }));
     render(<App />);
     await loadUser("EthosLab");
     await screen.findByText("EthosLab");
 
-    // Off by default; one click turns it on.
-    await userEvent.click(screen.getByRole("button", { name: /nametag/i }));
+    // Slider index 0 = sneak (Crouch), 1 = run, 2 = fly
+    fireEvent.change(screen.getByRole("slider", { name: /animation mode/i }), { target: { value: "0" } });
     await userEvent.click(screen.getByRole("button", { name: /generate gif/i }));
 
-    expect(generateGif).toHaveBeenCalledWith(
-      expect.objectContaining({ showNametag: true, username: "EthosLab" })
-    );
+    const link = await screen.findByRole("link", { name: /download gif/i });
+    expect(link).toHaveAttribute("download", "EthosLab-sneak.gif");
+  });
+
+  it("toggles the nametag and still generates from the live viewer", async () => {
+    vi.mocked(fetchProfile).mockResolvedValue(profile);
+    vi.mocked(captureViewerGif).mockResolvedValue(new Blob(["gif"], { type: "image/gif" }));
+    render(<App />);
+    await loadUser("EthosLab");
+    await screen.findByText("EthosLab");
+
+    // Off by default; one click turns it on. The nametag now lives on the live
+    // viewer (WYSIWYG), so it's not a capture argument — just confirm the toggle
+    // sticks and a GIF is still produced.
+    const nametag = screen.getByRole("checkbox", { name: /nametag/i });
+    await userEvent.click(nametag);
+    expect(nametag).toBeChecked();
+
+    await userEvent.click(screen.getByRole("button", { name: /generate gif/i }));
+    expect(await screen.findByRole("link", { name: /download gif/i })).toBeInTheDocument();
+    expect(captureViewerGif).toHaveBeenCalled();
   });
 
   it("opens settings and switches the panorama source", async () => {

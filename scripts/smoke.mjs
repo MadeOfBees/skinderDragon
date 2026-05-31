@@ -140,6 +140,10 @@ async function generate({ mode = "run", orbit = false, transparent }) {
     const buf = await (await fetch(u)).arrayBuffer();
     return Array.from(new Uint8Array(buf));
   }, src);
+  // The result opens in a modal that overlays the controls — close it (Escape)
+  // before the next generate() tries to click a mode button beneath it.
+  await page.keyboard.press("Escape");
+  await page.waitForSelector('[data-testid="gif-modal"]', { state: "detached", timeout: 5000 });
   return analyzeGif(bytes);
 }
 
@@ -173,6 +177,15 @@ try {
   // Sneak is a held pose → a cheap single-frame GIF (exercises the non-cyclic path).
   const sneak = await generate({ mode: "sneak", orbit: false, transparent: false });
   check("sneak (held pose) → valid GIF", sneak.valid, JSON.stringify(sneak));
+
+  // Held pose + orbit: the pose must persist while the wrapper spins (this is the
+  // path that breaks if the held pose isn't settled before the orbit driver runs).
+  const sneakOrbit = await generate({ mode: "sneak", orbit: true, transparent: false });
+  check(
+    "sneak + orbit → valid looping GIF",
+    sneakOrbit.valid && sneakOrbit.looping,
+    JSON.stringify(sneakOrbit)
+  );
 
   // --- Skin with a cape: cover cape load + orbit.
   await loadUser("jeb_");

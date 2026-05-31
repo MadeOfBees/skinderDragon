@@ -2,12 +2,10 @@ import { describe, it, expect, vi } from "vitest";
 
 // Avoid pulling three.js into the test; we only exercise the pure helpers
 // and the DOM-free gifenc encoding path here.
-vi.mock("skinview3d", () => ({ SkinViewer: class {}, WalkingAnimation: class {} }));
+vi.mock("skinview3d", () => ({ SkinViewer: class {} }));
 
 import {
-  WALK_CYCLE,
-  walkProgressForFrame,
-  orbitRotationForFrame,
+  orbitRotationForPhase,
   frameFormat,
   pickTransparentIndex,
   encodeFramesToGif,
@@ -15,17 +13,11 @@ import {
 // Shared with the headless smoke so the GIF byte-parsing lives in one place.
 import { analyzeGif } from "../../scripts/analyze-gif.mjs";
 
-describe("frame math", () => {
-  it("walk progress spans exactly one limb cycle across the loop", () => {
-    expect(walkProgressForFrame(0, 30)).toBe(0);
-    expect(walkProgressForFrame(30, 30)).toBeCloseTo(WALK_CYCLE, 10);
-    expect(walkProgressForFrame(15, 30)).toBeCloseTo(WALK_CYCLE / 2, 10);
-  });
-
-  it("orbit rotation spans a full turn across the loop", () => {
-    expect(orbitRotationForFrame(0, 30)).toBe(0);
-    expect(orbitRotationForFrame(30, 30)).toBeCloseTo(Math.PI * 2, 10);
-    expect(orbitRotationForFrame(15, 30)).toBeCloseTo(Math.PI, 10);
+describe("orbit phase math", () => {
+  it("spans a full turn across the loop (t: 0→1)", () => {
+    expect(orbitRotationForPhase(0)).toBe(0);
+    expect(orbitRotationForPhase(1)).toBeCloseTo(Math.PI * 2, 10);
+    expect(orbitRotationForPhase(0.5)).toBeCloseTo(Math.PI, 10);
   });
 });
 
@@ -44,18 +36,17 @@ describe("encoder helpers", () => {
 function solidFrame(size: number): Uint8ClampedArray {
   const data = new Uint8ClampedArray(size * size * 4);
   for (let i = 0; i < data.length; i += 4) {
-    data[i] = 200; // r
-    data[i + 1] = 60; // g
-    data[i + 2] = 40; // b
-    data[i + 3] = 255; // a
+    data[i] = 200;
+    data[i + 1] = 60;
+    data[i + 2] = 40;
+    data[i + 3] = 255;
   }
   return data;
 }
 
 function partlyTransparentFrame(size: number): Uint8ClampedArray {
   const data = solidFrame(size);
-  // Make the first pixel fully transparent.
-  data[3] = 0;
+  data[3] = 0; // first pixel fully transparent
   return data;
 }
 

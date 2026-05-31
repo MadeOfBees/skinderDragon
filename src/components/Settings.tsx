@@ -1,6 +1,7 @@
 import { useEffect, type ReactNode } from "react";
 import type { PanoramaSource } from "./Panorama";
-import { seg } from "../lib/ui";
+import { CloseIcon } from "./CloseIcon";
+import { Multibutton } from "./Multibutton";
 
 /** One labelled option row: title + hint on the left, control on the right. */
 function SettingRow({
@@ -18,7 +19,7 @@ function SettingRow({
         <div className="text-sm">{label}</div>
         {hint && <p className="mt-0.5 text-[0.7rem] leading-snug text-muted">{hint}</p>}
       </div>
-      <div className="flex shrink-0 gap-2">{children}</div>
+      <div className="shrink-0">{children}</div>
     </div>
   );
 }
@@ -64,7 +65,7 @@ export function Settings({
         className="mc-panel mc-modal mc-dialog-in"
         onClick={(e) => e.stopPropagation()}
       >
-        <header className="mb-3 flex items-center justify-between gap-3 border-b-2 border-black/50 pb-2.5">
+        <header className="mc-modal-header flex items-center justify-between gap-3">
           <h2 className="mc-title text-[1.1rem]">Settings</h2>
           <button
             type="button"
@@ -72,40 +73,30 @@ export function Settings({
             aria-label="Close settings"
             className="mc-btn mc-btn-stone mc-btn-icon"
           >
-            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-              <path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
-            </svg>
+            <CloseIcon />
           </button>
         </header>
 
-        <SettingRow label="Panorama" hint="Title-screen background source.">
-          <button
-            type="button"
-            data-testid="panorama-release"
-            aria-pressed={panoramaSource === "release"}
-            className={seg(panoramaSource === "release")}
-            onClick={() => onPanoramaSource("release")}
-          >
-            Release
-          </button>
-          <button
-            type="button"
-            data-testid="panorama-snapshot"
-            aria-pressed={panoramaSource === "snapshot"}
-            className={seg(panoramaSource === "snapshot")}
-            onClick={() => onPanoramaSource("snapshot")}
-          >
-            Snapshot
-          </button>
-        </SettingRow>
+        <div className="mc-modal-body">
+          <SettingRow label="Panorama" hint="Title-screen background source.">
+            <Multibutton
+              options={[
+                { label: "Release", value: "release", testId: "panorama-release" },
+                { label: "Snapshot", value: "snapshot", testId: "panorama-snapshot" },
+              ]}
+              value={panoramaSource}
+              onChange={onPanoramaSource}
+            />
+          </SettingRow>
 
-        <button
-          type="button"
-          onClick={onClose}
-          className="mc-btn mc-btn-green mc-btn-hero mt-4 w-full"
-        >
-          Done
-        </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="mc-btn mc-btn-green mc-btn-hero mt-4 w-full"
+          >
+            Done
+          </button>
+        </div>
       </div>
     </div>
   );

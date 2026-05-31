@@ -1,26 +1,27 @@
 import { useCallback, useEffect, useState, type SyntheticEvent } from "react";
 import { fetchProfile, ProfileError, type MinecraftProfile } from "./lib/profile";
-import { generateGif, type AnimationMode, type Background } from "./lib/exportGif";
+import { type AnimationMode, DEFAULT_GIF_SIZE } from "./lib/exportGif";
 import { Panorama, type PanoramaSource } from "./components/Panorama";
 import { Settings } from "./components/Settings";
+import { GifModal } from "./components/GifModal";
 import { Toast } from "./components/Toast";
+import { SearchBar } from "./components/SearchBar";
+import { Switch } from "./components/Switch";
+import { Slider } from "./components/Slider";
+import { Multibutton } from "./components/Multibutton";
 import { usePreview } from "./hooks/usePreview";
 import { renderHead, renderCape } from "./lib/head";
 import { loadLastSearch, rememberLastSearch, setFavicon } from "./lib/favicon";
 import { loadPanoramaSource, savePanoramaSource } from "./lib/settings";
-import { seg } from "./lib/ui";
 import { randomSplash } from "./data/splashes";
 
-const MODES: { id: AnimationMode; label: string }[] = [
-  { id: "run", label: "Run" },
-  { id: "sneak", label: "Sneak" },
-  { id: "fly", label: "Fly" },
-];
+const MODE_ORDER: AnimationMode[] = ["sneak", "run", "fly"];
+const MODE_LABELS: Record<AnimationMode, string> = {
+  sneak: "Crouch",
+  run: "Run",
+  fly: "Fly",
+};
 
-const modeLabel = (id: AnimationMode) =>
-  MODES.find((m) => m.id === id)?.label ?? id;
-
-// The classic "render me upside-down" usernames.
 const FLIP_NAMES = /^(dinnerbone|grumm)$/i;
 
 // Optional GIF size/frame-count overrides via URL query (`?gifSize=256&gifFrames=8`).
@@ -57,12 +58,20 @@ export function App() {
   const [generating, setGenerating] = useState(false);
   const [progress, setProgress] = useState(0);
   const [gifUrl, setGifUrl] = useState<string | null>(null);
+  const [gifModalOpen, setGifModalOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
   const [splash] = useState(randomSplash);
 
   const upsideDown = !!profile && FLIP_NAMES.test(profile.username);
-  const canvasRef = usePreview(profile, mode, orbit, showNametag, upsideDown, generating);
+  const { canvasRef, captureGif } = usePreview(
+    profile,
+    mode,
+    orbit,
+    showNametag,
+    upsideDown,
+    generating
+  );
 
   // On first load, restore the last-searched player: favicon + prefilled name.
   useEffect(() => {
@@ -113,6 +122,8 @@ export function App() {
     };
   }, [gifUrl]);
 
+  const closeSettings = useCallback(() => setSettingsOpen(false), []);
+  const closeGifModal = useCallback(() => setGifModalOpen(false), []);
   const dismissToast = useCallback(() => setToast(null), []);
 
   const changePanoramaSource = useCallback((source: PanoramaSource) => {
@@ -126,6 +137,7 @@ export function App() {
     setError(null);
     setLoading(true);
     setGifUrl(null);
+    setGifModalOpen(false);
     try {
       setProfile(await fetchProfile(username));
     } catch (err) {
@@ -145,21 +157,11 @@ export function App() {
     setGenerating(true);
     setProgress(0);
     setGifUrl(null);
-    const background: Background =
-      bgKind === "color"
-        ? { kind: "color", color: bgColor }
-        : { kind: "transparent" };
+    setGifModalOpen(true);
     try {
-      const blob = await generateGif({
-        skinUrl: profile.skinUrl,
-        capeUrl: profile.capeUrl,
-        slim: profile.slim,
-        mode,
-        orbit,
-        showNametag,
-        username: profile.username,
-        background,
-        upsideDown,
+      // The GIF is captured from the live preview viewer — WYSIWYG.
+      const blob = await captureGif({
+        background: bgKind === "color" ? { kind: "color", color: bgColor } : { kind: "transparent" },
         onProgress: setProgress,
         ...GIF_OVERRIDES,
       });
@@ -168,6 +170,7 @@ export function App() {
     } catch (err) {
       console.error(err);
       setError("Failed to generate the GIF. See the console for details.");
+      setGifModalOpen(false);
     } finally {
       setGenerating(false);
     }
@@ -192,10 +195,24 @@ export function App() {
       </button>
       <Settings
         open={settingsOpen}
-        onClose={() => setSettingsOpen(false)}
+        onClose={closeSettings}
         panoramaSource={panoramaSource}
         onPanoramaSource={changePanoramaSource}
       />
+      {profile && (
+        <GifModal
+          open={gifModalOpen}
+          generating={generating}
+          progress={progress}
+          gifUrl={gifUrl}
+          username={profile.username}
+          modeLabel={MODE_LABELS[mode]}
+          orbit={orbit}
+          size={GIF_OVERRIDES.size ?? DEFAULT_GIF_SIZE}
+          downloadName={`${profile.username}-${mode}${orbit ? "-orbit" : ""}.gif`}
+          onClose={closeGifModal}
+        />
+      )}
 
       <div className="relative z-0 mx-auto w-full max-w-3xl px-5 pt-10 pb-24">
         <header className="mb-8 text-center">
@@ -207,27 +224,15 @@ export function App() {
           </span>
         </header>
 
-        <form className="mx-auto flex max-w-md gap-2.5" onSubmit={onSubmit}>
-          <input
-            type="text"
-            placeholder="Minecraft username"
-            value={username}
-            maxLength={16}
-            autoComplete="off"
-            spellCheck={false}
-            onChange={(e) => setUsername(e.target.value)}
-            className="mc-input flex-1 text-base"
-          />
-          <button type="submit" disabled={loading} className="mc-btn mc-btn-green">
-            {loading ? "Locating…" : "Load skin"}
-          </button>
-        </form>
-
-        {error && (
-          <p data-testid="error" className="mc-panel mx-auto mt-4 max-w-md p-3 text-center text-red-300">
-            {error}
-          </p>
-        )}
+        <SearchBar
+          value={username}
+          onChange={setUsername}
+          onSubmit={onSubmit}
+          disabled={loading}
+          placeholder="Minecraft username"
+          error={error}
+          className="mx-auto w-full max-w-md"
+        />
 
         {profile && (
           <main className="mt-8 grid items-start gap-6 justify-items-center md:grid-cols-[340px_1fr] md:justify-items-stretch">
@@ -266,7 +271,7 @@ export function App() {
                   data-testid="download-skin"
                   href={profile.skinUrl}
                   download={`${profile.username}-skin.png`}
-                  className="mc-btn mc-btn-stone text-[0.7rem] no-underline"
+                  className="mc-btn mc-btn-stone text-[0.7rem]"
                 >
                   ⬇ Skin PNG
                 </a>
@@ -275,7 +280,7 @@ export function App() {
                     data-testid="download-head"
                     href={headUrl}
                     download={`${profile.username}-head.png`}
-                    className="mc-btn mc-btn-stone text-[0.7rem] no-underline"
+                    className="mc-btn mc-btn-stone text-[0.7rem]"
                   >
                     ⬇ Head PNG
                   </a>
@@ -284,56 +289,33 @@ export function App() {
             </div>
 
             <div className="flex w-full max-w-90 flex-col gap-4">
-              <fieldset className="mc-panel m-0 p-3.5">
-                <legend className="px-1.5 text-[0.7rem] uppercase text-muted">Animation</legend>
-                <div className="grid grid-cols-3 gap-2.5">
-                  {MODES.map((m) => (
-                    <button
-                      key={m.id}
-                      type="button"
-                      className={seg(mode === m.id)}
-                      onClick={() => setMode(m.id)}
-                    >
-                      {m.label}
-                    </button>
-                  ))}
+              <div role="group" aria-label="Animation" className="mc-panel m-0 p-3.5">
+                <p className="mc-section-label">Animation</p>
+                <Slider
+                  label="Mode"
+                  value={MODE_ORDER.indexOf(mode)}
+                  min={0}
+                  max={2}
+                  valueLabel={MODE_LABELS[mode]}
+                  onChange={(i: number) => setMode(MODE_ORDER[i])}
+                  ariaLabel="Animation mode"
+                />
+                <div className="mt-2 flex flex-col">
+                  <Switch label="Orbit" checked={orbit} onChange={() => setOrbit((o) => !o)} />
+                  <Switch label="Nametag" checked={showNametag} onChange={() => setShowNametag((n) => !n)} />
                 </div>
-                {/* Orbit and nametag are modifiers, not modes — they layer on
-                    top of whichever animation is selected. */}
-                <div className="mt-2.5 grid grid-cols-2 gap-2.5">
-                  <button
-                    type="button"
-                    aria-pressed={orbit}
-                    className={seg(orbit)}
-                    onClick={() => setOrbit((o) => !o)}
-                  >
-                    Orbit{orbit ? " ✓" : ""}
-                  </button>
-                  <button
-                    type="button"
-                    aria-pressed={showNametag}
-                    className={seg(showNametag)}
-                    onClick={() => setShowNametag((n) => !n)}
-                  >
-                    Nametag{showNametag ? " ✓" : ""}
-                  </button>
-                </div>
-              </fieldset>
+              </div>
 
-              <fieldset className="mc-panel m-0 p-3.5">
-                <legend className="px-1.5 text-[0.7rem] uppercase text-muted">Background</legend>
-                <div className="flex gap-2.5">
-                  <button type="button" className={`${seg(bgKind === "color")} flex-1`} onClick={() => setBgKind("color")}>
-                    Solid
-                  </button>
-                  <button
-                    type="button"
-                    className={`${seg(bgKind === "transparent")} flex-1`}
-                    onClick={() => setBgKind("transparent")}
-                  >
-                    Transparent
-                  </button>
-                </div>
+              <div role="group" aria-label="Background" className="mc-panel m-0 p-3.5">
+                <p className="mc-section-label">Background</p>
+                <Multibutton
+                  options={[
+                    { label: "Solid", value: "color" },
+                    { label: "Transparent", value: "transparent" },
+                  ]}
+                  value={bgKind}
+                  onChange={(v: "color" | "transparent") => setBgKind(v)}
+                />
                 {bgKind === "color" && (
                   <label className="mt-3 flex items-center gap-2.5 text-sm text-muted">
                     <input
@@ -345,7 +327,7 @@ export function App() {
                     <span>{bgColor}</span>
                   </label>
                 )}
-              </fieldset>
+              </div>
 
               <button
                 type="button"
@@ -355,39 +337,6 @@ export function App() {
               >
                 {generating ? `Generating… ${Math.round(progress * 100)}%` : "Generate GIF"}
               </button>
-
-              {generating && (
-                <div className="mc-xp">
-                  <div className="mc-xp-fill" style={{ width: `${progress * 100}%` }} />
-                </div>
-              )}
-
-              {gifUrl && !generating && (
-                <div className="flex flex-col items-center gap-3">
-                  <div className="mc-tooltip-host mc-slot mc-slot-hover relative p-2">
-                    <div className="checkerboard overflow-hidden leading-none">
-                      <img
-                        data-testid="result-gif"
-                        src={gifUrl}
-                        alt={`${profile.username} ${mode} animation`}
-                        className="pixelated block h-64 w-64"
-                      />
-                    </div>
-                    <span className="mc-tooltip">
-                      {profile.username} · {modeLabel(mode)}
-                      {orbit ? " + Orbit" : ""} · 512×512
-                    </span>
-                  </div>
-                  <a
-                    data-testid="download"
-                    href={gifUrl}
-                    download={`${profile.username}-${mode}${orbit ? "-orbit" : ""}.gif`}
-                    className="mc-btn mc-btn-stone block w-full text-center no-underline"
-                  >
-                    ⬇ Download GIF
-                  </a>
-                </div>
-              )}
             </div>
           </main>
         )}
@@ -397,7 +346,7 @@ export function App() {
         <span>skinderdragon 1.0 — not affiliated with Mojang</span>
         <span className="text-right">
           lookup via{" "}
-          <a className="underline" href="https://playerdb.co">
+          <a href="https://playerdb.co">
             playerdb
           </a>{" "}
           · skins from Mojang&apos;s CDN

@@ -1,0 +1,1 @@
+Search bar gets a light grey background around it unlike the dark grey that's usually used instead
