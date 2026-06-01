@@ -1,5 +1,6 @@
 import { Modal } from "./Modal";
 import { PreviewSlot } from "./PreviewSlot";
+import { DownloadIcon } from "../icons/DownloadIcon";
 
 export interface GifModalProps {
   open: boolean;
@@ -82,7 +83,7 @@ export function GifModal({
                 download={downloadName}
                 className="mc-btn mc-btn-green mc-btn-hero mt-4 block w-full text-center"
               >
-                ⬇ Download GIF
+                <DownloadIcon /> Download GIF
               </a>
             )}
           </>

@@ -1,4 +1,5 @@
 import type { FormEvent } from "react";
+import { SearchIcon } from "../icons/SearchIcon";
 
 interface SearchBarProps {
   value: string;
@@ -32,18 +33,7 @@ export function SearchBar({
           spellCheck={false}
         />
         <button type="submit" disabled={disabled} aria-label="Search" className="mc-search-btn">
-          {/* Placeholder magnifier — final SVG to be dropped in later. */}
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            aria-hidden="true"
-          >
-            <circle cx="10" cy="10" r="6" />
-            <line x1="14.5" y1="14.5" x2="20" y2="20" />
-          </svg>
+          <SearchIcon />
         </button>
       </form>
       {error && (
