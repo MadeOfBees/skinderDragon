@@ -345,21 +345,64 @@ a.mc-btn.mc-btn-green:active:not(:disabled),
   align-items: center;
   padding: 20px 0;
 }
+.mc-range-track-svgs {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 12px;
+  display: flex;
+  align-items: stretch;
+  pointer-events: none;
+}
+.mc-track-cap {
+  flex-shrink: 0;
+}
+.mc-track-cap svg {
+  display: block;
+  width: 6px;
+  height: 12px;
+}
+.mc-track-fills {
+  flex: 1;
+  position: relative;
+}
+.mc-track-fill {
+  position: absolute;
+  inset: 0;
+}
+.mc-track-fill svg {
+  display: block;
+  width: 100%;
+  height: 12px;
+}
+.mc-track-fill-green {
+  right: auto;
+  width: var(--pct, 0%);
+  overflow: hidden;
+}
+.mc-track-step {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+.mc-track-step svg {
+  display: block;
+  width: 2px;
+  height: 12px;
+}
 .mc-range {
   appearance: none;
   -webkit-appearance: none;
+  position: relative;
+  z-index: 1;
   width: 100%;
-  height: 4px;
-  border: none;
-  border-radius: 0;
+  height: 12px;
   outline: none;
   cursor: pointer;
-  /* --pct inherited from .mc-range-track inline style */
-  background: linear-gradient(
-    to right,
-    var(--color-grass) var(--pct, 0%),
-    #8b8b8b var(--pct, 0%)
-  );
+  background: transparent;
 }
 .mc-range::-webkit-slider-thumb {
   -webkit-appearance: none;
