@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type SyntheticEvent } from "react";
+import { useCallback, useEffect, useState, type ReactNode, type SyntheticEvent } from "react";
 import { fetchProfile, ProfileError, type MinecraftProfile } from "./lib/profile";
 import { type AnimationMode, DEFAULT_GIF_SIZE } from "./lib/exportGif";
 import { Panorama, type PanoramaSource } from "./components/Panorama";
@@ -6,6 +6,7 @@ import { Settings } from "./components/Settings";
 import { GifModal } from "./components/GifModal";
 import { Toast } from "./components/Toast";
 import { SearchBar } from "./components/SearchBar";
+import { PreviewSlot } from "./components/PreviewSlot";
 import { Switch } from "./components/Switch";
 import { Slider } from "./components/Slider";
 import { Multibutton } from "./components/Multibutton";
@@ -15,6 +16,15 @@ import { loadLastSearch, rememberLastSearch, setFavicon } from "./lib/favicon";
 import { loadPanoramaSource, savePanoramaSource, loadEdition, saveEdition } from "./lib/settings";
 import type { Edition } from "./lib/providers";
 import { randomSplash } from "./data/splashes";
+
+function ControlGroup({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div role="group" aria-label={label} className="mc-panel m-0 p-3.5">
+      <p className="mc-section-label">{label}</p>
+      {children}
+    </div>
+  );
+}
 
 const MODE_ORDER: AnimationMode[] = ["sneak", "run", "fly"];
 const MODE_LABELS: Record<AnimationMode, string> = {
@@ -248,11 +258,9 @@ export function App() {
         {profile && (
           <main className="mt-8 grid items-start gap-6 justify-items-center md:grid-cols-[340px_1fr] md:justify-items-stretch">
             <div className="flex flex-col items-center gap-3">
-              <div className="mc-slot p-2">
-                <div className="checkerboard overflow-hidden leading-none">
-                  <canvas ref={canvasRef} className="block cursor-grab active:cursor-grabbing" />
-                </div>
-              </div>
+              <PreviewSlot>
+                <canvas ref={canvasRef} className="block cursor-grab active:cursor-grabbing" />
+              </PreviewSlot>
               <span className="inline-flex items-center gap-2">
                 {headUrl && (
                   <img src={headUrl} alt="" className="pixelated h-6 w-6 border-2 border-black" />
@@ -300,8 +308,7 @@ export function App() {
             </div>
 
             <div className="flex w-full max-w-90 flex-col gap-4">
-              <div role="group" aria-label="Animation" className="mc-panel m-0 p-3.5">
-                <p className="mc-section-label">Animation</p>
+              <ControlGroup label="Animation">
                 <Slider
                   label="Mode"
                   value={MODE_ORDER.indexOf(mode)}
@@ -315,10 +322,9 @@ export function App() {
                   <Switch label="Orbit" checked={orbit} onChange={() => setOrbit((o) => !o)} />
                   <Switch label="Nametag" checked={showNametag} onChange={() => setShowNametag((n) => !n)} />
                 </div>
-              </div>
+              </ControlGroup>
 
-              <div role="group" aria-label="Background" className="mc-panel m-0 p-3.5">
-                <p className="mc-section-label">Background</p>
+              <ControlGroup label="Background">
                 <Multibutton
                   options={[
                     { label: "Solid", value: "color" },
@@ -338,7 +344,7 @@ export function App() {
                     <span>{bgColor}</span>
                   </label>
                 )}
-              </div>
+              </ControlGroup>
 
               <button
                 type="button"

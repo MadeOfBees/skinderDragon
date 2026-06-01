@@ -1,7 +1,7 @@
-import { useEffect, type ReactNode } from "react";
+import { type ReactNode } from "react";
 import type { PanoramaSource } from "./Panorama";
 import type { Edition } from "../lib/providers";
-import { CloseIcon } from "./CloseIcon";
+import { Modal } from "./Modal";
 import { Multibutton } from "./Multibutton";
 
 /** One labelled option row: title + hint on the left, control on the right. */
@@ -42,72 +42,39 @@ export function Settings({
   edition,
   onEdition,
 }: SettingsProps) {
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
-
-  if (!open) return null;
-
   return (
-    <div
-      className="mc-modal-backdrop"
-      onClick={onClose}
-      role="dialog"
-      aria-modal="true"
-      aria-label="Settings"
-      data-testid="settings"
-    >
-      <div
-        className="mc-panel mc-modal mc-dialog-in"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <header className="mc-modal-header flex items-center justify-between gap-3">
-          <h2 className="mc-title text-[1.1rem]">Settings</h2>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close settings"
-            className="mc-btn mc-btn-stone mc-btn-icon"
-          >
-            <CloseIcon />
-          </button>
-        </header>
+    <Modal open={open} title="Settings" ariaLabel="Settings" onClose={onClose} testId="settings">
+      <div className="mc-modal-body">
+        <SettingRow label="Edition" hint="Which Minecraft edition to search.">
+          <Multibutton
+            options={[
+              { label: "Java", value: "java" as Edition, testId: "edition-java" },
+              { label: "Bedrock", value: "bedrock" as Edition, testId: "edition-bedrock" },
+            ]}
+            value={edition}
+            onChange={onEdition}
+          />
+        </SettingRow>
 
-        <div className="mc-modal-body">
-          <SettingRow label="Edition" hint="Which Minecraft edition to search.">
-            <Multibutton
-              options={[
-                { label: "Java", value: "java" as Edition, testId: "edition-java" },
-                { label: "Bedrock", value: "bedrock" as Edition, testId: "edition-bedrock" },
-              ]}
-              value={edition}
-              onChange={onEdition}
-            />
-          </SettingRow>
+        <SettingRow label="Panorama" hint="Title-screen background source.">
+          <Multibutton
+            options={[
+              { label: "Release", value: "release", testId: "panorama-release" },
+              { label: "Snapshot", value: "snapshot", testId: "panorama-snapshot" },
+            ]}
+            value={panoramaSource}
+            onChange={onPanoramaSource}
+          />
+        </SettingRow>
 
-          <SettingRow label="Panorama" hint="Title-screen background source.">
-            <Multibutton
-              options={[
-                { label: "Release", value: "release", testId: "panorama-release" },
-                { label: "Snapshot", value: "snapshot", testId: "panorama-snapshot" },
-              ]}
-              value={panoramaSource}
-              onChange={onPanoramaSource}
-            />
-          </SettingRow>
-
-          <button
-            type="button"
-            onClick={onClose}
-            className="mc-btn mc-btn-green mc-btn-hero mt-4 w-full"
-          >
-            Done
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="mc-btn mc-btn-green mc-btn-hero mt-4 w-full"
+        >
+          Done
+        </button>
       </div>
-    </div>
+    </Modal>
   );
 }
