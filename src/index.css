@@ -562,33 +562,6 @@ a.mc-btn.mc-btn-green:active:not(:disabled),
   opacity: 1;
 }
 
-/* ── Advancement toast ────────────────────────────────────────────────────── */
-.mc-toast {
-  position: fixed;
-  top: 18px;
-  right: 18px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  background: linear-gradient(#313233, #1e1e1f);
-  border: var(--border-dark);
-  box-shadow: var(--shadow-panel-bevel),
-    inset 1px 1px #1e1e1f,
-    inset -1px -1px #131313;
-  padding: 8px 12px;
-  /* Above modals (backdrop z-70) so the advancement isn't dimmed/blurred. */
-  z-index: 80;
-  animation: mc-toast-in 0.35s ease-out;
-}
-@keyframes mc-toast-in {
-  from {
-    transform: translateX(120%);
-  }
-  to {
-    transform: translateX(0);
-  }
-}
-
 /* ── Settings dialog (Ore UI "Options" screen) ────────────────────────────── */
 .mc-modal-backdrop {
   position: fixed;

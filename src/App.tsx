@@ -4,7 +4,6 @@ import { type AnimationMode, DEFAULT_GIF_SIZE } from "./lib/exportGif";
 import { Panorama, type PanoramaSource } from "./components/Panorama";
 import { Settings } from "./components/Settings";
 import { GifModal } from "./components/GifModal";
-import { Toast } from "./components/Toast";
 import { SearchBar } from "./components/SearchBar";
 import { PreviewSlot } from "./components/PreviewSlot";
 import { Switch } from "./components/Switch";
@@ -74,8 +73,7 @@ export function App() {
   const [progress, setProgress] = useState(0);
   const [gifUrl, setGifUrl] = useState<string | null>(null);
   const [gifModalOpen, setGifModalOpen] = useState(false);
-  const [toast, setToast] = useState<string | null>(null);
-  const generationAbortRef = useRef<AbortController | null>(null);
+const generationAbortRef = useRef<AbortController | null>(null);
 
   const [splash] = useState(randomSplash);
 
@@ -140,8 +138,7 @@ export function App() {
 
   const closeSettings = useCallback(() => setSettingsOpen(false), []);
   const closeGifModal = useCallback(() => setGifModalOpen(false), []);
-  const dismissToast = useCallback(() => setToast(null), []);
-  const cancelGeneration = useCallback(() => {
+const cancelGeneration = useCallback(() => {
     generationAbortRef.current?.abort();
   }, []);
 
@@ -195,7 +192,6 @@ export function App() {
         ...GIF_OVERRIDES,
       });
       setGifUrl(URL.createObjectURL(blob));
-      setToast("Picture Perfect");
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") {
         setGifModalOpen(false);
@@ -218,9 +214,7 @@ export function App() {
   return (
     <>
       <Panorama paused={generating} source={panoramaSource} />
-      <Toast message={toast} headUrl={headUrl} onDismiss={dismissToast} />
-
-      <Button
+<Button
         data-testid="open-settings"
         aria-label="Settings"
         title="Settings"
