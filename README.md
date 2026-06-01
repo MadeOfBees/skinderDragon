@@ -60,9 +60,6 @@ client-side.
   so what you see is what you download.
 - 💾 **One-click downloads** — a 512×512 GIF (orbit on) or PNG (orbit off), plus the raw
   skin PNG and a rendered head PNG.
-- ✨ **Minecraft flourishes** — random splash text, an "Advancement Made!" toast, the
-  searched player's head as the tab favicon (remembered across visits), and the
-  Dinnerbone/Grumm upside-down easter egg.
 
 ## How it works
 
