@@ -476,25 +476,78 @@ a.mc-btn.mc-btn-green:active:not(:disabled) {
   border-color: var(--color-grass-bright);
 }
 
-/* Search bar: flush input + icon button, no gap, single inner border */
-.mc-search-bar .mc-input {
-  border-right: none;
-  padding: 0.3rem 0.7rem;
-}
+/* ── Search bar — greyscale, matches UI examples/SearchBar*.png ───────────── */
 .mc-search-panel {
-  background: #6b6c6d;
-  box-shadow: inset 2px 2px #7a7b7c, inset -2px -2px #4a4b4c;
+  background: color-mix(in srgb, var(--color-panel) 92%, transparent);
+  border: 2px solid #131313;
+  box-shadow: inset 2px 2px #48494a, inset -2px -2px #1e1e1f;
 }
+/* Recessed dark field: black frame, dark-top / light-bottom inner bevel. */
+.mc-search-bar .mc-input {
+  background: #5e5e5e;
+  color: #d9d9d9;
+  border: 2px solid #000;
+  padding: 0.3rem 0.7rem;
+  text-shadow: none;
+  box-shadow: inset 0 2px #464446, inset 0 -2px #b2b2b2;
+  caret-color: #d9d9d9;
+}
+.mc-search-bar .mc-input::placeholder {
+  color: #d9d9d9;
+}
+.mc-search-bar .mc-input::selection {
+  background: rgba(255, 255, 255, 0.3);
+}
+/* Hover/focus: black frame turns white, text brightens (no green). */
+.mc-search-bar .mc-input:hover,
+.mc-search-bar .mc-input:focus {
+  border-color: #fff;
+  color: #fefefe;
+}
+/* Light-grey square button, taller than the input so it overhangs top & bottom;
+   raised bevel, near-black frame, dark glyph. */
 .mc-search-btn {
   display: grid;
   place-items: center;
-  padding: 0 0.75rem;
-  align-self: stretch;
+  width: 2.7rem;
+  height: 2.7rem;
+  background: #c6c6c6;
+  color: #4c4c4c;
+  border: 2px solid #131313;
+  cursor: pointer;
+  box-shadow: inset 2px 2px #f7f7f7, inset -2px -2px #656465;
+  /* Snappy darken on hover/press — short enough to read as instant feedback. */
+  transition: background 0.06s linear, box-shadow 0.06s linear, color 0.06s linear;
 }
 .mc-search-btn svg {
-  width: 1.4rem;
-  height: 1.4rem;
-  filter: drop-shadow(0.08em 0.08em 0 rgba(0, 0, 0, 0.5));
+  width: 62%;
+  height: 62%;
+}
+/* Hover darkens immediately (raised bevel kept) so the feedback isn't delayed;
+   the glyph deepens with it. */
+.mc-search-btn:hover:not(:disabled) {
+  background: #b3b3b3;
+  color: #3a3a3a;
+  box-shadow: inset 2px 2px #e4e4e4, inset -2px -2px #5a5a5a;
+}
+/* Pressed darkens further with an inverted bevel and the deepest glyph. Released
+   on mouseup, so the clicked look never lingers past the actual press. */
+.mc-search-btn:active:not(:disabled) {
+  background: #a3a3a3;
+  color: #2e2e2e;
+  box-shadow: inset 2px 2px #5a5a5a, inset -2px -2px #ededed;
+}
+/* Loading/disabled: a flat, dimmed *raised* look — deliberately NOT the pressed
+   look, so the click pops back out immediately even while a slow search runs.
+   Glyph keeps its base colour; only the button surface signals "busy". */
+.mc-search-btn:disabled {
+  background: #bcbcbc;
+  box-shadow: inset 2px 2px #ededed, inset -2px -2px #6f6f6f;
+  cursor: default;
+}
+.mc-search-btn:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: -2px;
 }
 
 /* ── XP-bar progress ──────────────────────────────────────────────────────── */

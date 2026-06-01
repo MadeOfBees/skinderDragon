@@ -240,7 +240,7 @@ export function App() {
           onChange={setUsername}
           onSubmit={onSubmit}
           disabled={loading}
-          placeholder={edition === "bedrock" ? "Bedrock gamertag" : "Java username"}
+          placeholder={edition === "bedrock" ? "Bedrock gamertag…" : "Java username…"}
           error={error}
           className="mx-auto w-full max-w-md"
         />

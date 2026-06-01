@@ -20,8 +20,8 @@ export function SearchBar({
   className = "",
 }: SearchBarProps) {
   return (
-    <div className={`mc-panel mc-search-panel p-3.5 ${className}`}>
-      <form className="mc-search-bar flex" onSubmit={onSubmit}>
+    <div className={`mc-search-panel p-3.5 ${className}`}>
+      <form className="mc-search-bar flex items-center" onSubmit={onSubmit}>
         <input
           type="text"
           placeholder={placeholder}
@@ -31,23 +31,18 @@ export function SearchBar({
           autoComplete="off"
           spellCheck={false}
         />
-        <button
-          type="submit"
-          disabled={disabled}
-          aria-label="Search"
-          className="mc-btn mc-btn-stone mc-search-btn"
-        >
+        <button type="submit" disabled={disabled} aria-label="Search" className="mc-search-btn">
+          {/* Placeholder magnifier — final SVG to be dropped in later. */}
           <svg
             viewBox="0 0 24 24"
-            fill="currentColor"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
             aria-hidden="true"
-            style={{
-              width: "1.4rem",
-              height: "1.4rem",
-              filter: "drop-shadow(0.08em 0.08em 0 rgba(0,0,0,0.5))",
-            }}
           >
-            <path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z" />
+            <circle cx="10" cy="10" r="6" />
+            <line x1="14.5" y1="14.5" x2="20" y2="20" />
           </svg>
         </button>
       </form>
