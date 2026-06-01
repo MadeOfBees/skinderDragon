@@ -341,8 +341,10 @@ const cancelGeneration = useCallback(() => {
                     onChange={(i: number) => setPose(POSE_ORDER[i])}
                     ariaLabel="Pose"
                   />
-                  <Switch label="Orbit" checked={orbit} onChange={() => setOrbit((o) => !o)} />
-                  <Switch label="Nametag" checked={showNametag} onChange={() => setShowNametag((n) => !n)} />
+                  <div className="flex flex-col gap-2 px-0.5">
+                    <Switch label="Orbit" checked={orbit} onChange={() => setOrbit((o) => !o)} />
+                    <Switch label="Nametag" checked={showNametag} onChange={() => setShowNametag((n) => !n)} />
+                  </div>
                 </div>
               </ControlGroup>
 
