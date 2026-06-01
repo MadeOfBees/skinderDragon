@@ -46,13 +46,13 @@ export function Slider({
           <div className="mc-track-fills">
             <div className="mc-track-fill mc-track-fill-grey"><SliderGreyFillIcon /></div>
             <div className="mc-track-fill mc-track-fill-green"><SliderGreenFillIcon /></div>
-            {stepMarkers.map((pct) => (
-              <div key={pct} className="mc-track-step" style={{ left: `${pct * 100}%` }}>
-                <SliderStepIcon />
-              </div>
-            ))}
           </div>
           <div className="mc-track-cap mc-track-cap-right"><SliderRightCapIcon /></div>
+          {stepMarkers.map((pct) => (
+            <div key={pct} className="mc-track-step" style={{ left: `calc(${pct} * (100% - 32px) + 16px)` }}>
+              <SliderStepIcon />
+            </div>
+          ))}
         </div>
         <input
           type="range"

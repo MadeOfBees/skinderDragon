@@ -331,16 +331,16 @@ const cancelGeneration = useCallback(() => {
 
             <div className="flex w-full max-w-90 flex-col gap-4">
               <ControlGroup label="Animation">
-                <Slider
-                  label="Pose"
-                  value={POSE_ORDER.indexOf(pose)}
-                  min={0}
-                  max={4}
-                  valueLabel={POSE_LABELS[pose]}
-                  onChange={(i: number) => setPose(POSE_ORDER[i])}
-                  ariaLabel="Pose"
-                />
-                <div className="mt-2 flex flex-col">
+                <div className="flex flex-col gap-2">
+                  <Slider
+                    label="Pose"
+                    value={POSE_ORDER.indexOf(pose)}
+                    min={0}
+                    max={4}
+                    valueLabel={POSE_LABELS[pose]}
+                    onChange={(i: number) => setPose(POSE_ORDER[i])}
+                    ariaLabel="Pose"
+                  />
                   <Switch label="Orbit" checked={orbit} onChange={() => setOrbit((o) => !o)} />
                   <Switch label="Nametag" checked={showNametag} onChange={() => setShowNametag((n) => !n)} />
                 </div>
