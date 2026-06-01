@@ -10,6 +10,8 @@
 //
 // This module is the single seam for the data source.
 
+import { toMojangTextureUrl } from "./textures";
+
 export type Edition = "java" | "bedrock";
 
 export interface ResolvedTextures {
@@ -80,11 +82,17 @@ export function decodeTexturesProperty(base64Value: string): {
   }
   const skin = decoded.textures?.SKIN;
   if (!skin?.url) throw new ProfileError("This player has no skin.");
-  return {
-    skinUrl: skin.url,
-    capeUrl: decoded.textures.CAPE?.url ?? null,
-    slim: skin.metadata?.model === "slim",
-  };
+  try {
+    return {
+      skinUrl: toMojangTextureUrl(skin.url),
+      capeUrl: decoded.textures.CAPE?.url
+        ? toMojangTextureUrl(decoded.textures.CAPE.url)
+        : null,
+      slim: skin.metadata?.model === "slim",
+    };
+  } catch {
+    throw new ProfileError("This player's texture URL is not from Mojang's CDN.");
+  }
 }
 
 async function resolveJavaTextures(

@@ -5,17 +5,21 @@ import {
   ProfileError,
 } from "./providers";
 
-const SKIN_URL = "http://textures.minecraft.net/texture/skinhash";
-const CAPE_URL = "http://textures.minecraft.net/texture/capehash";
+const RAW_SKIN_URL = "http://textures.minecraft.net/texture/abc123";
+const RAW_CAPE_URL = "http://textures.minecraft.net/texture/c0ffee";
+const SKIN_URL = "https://textures.minecraft.net/texture/abc123";
+const CAPE_URL = "https://textures.minecraft.net/texture/c0ffee";
 
-function texturesValue(opts: { slim?: boolean; cape?: boolean } = {}): string {
+function texturesValue(
+  opts: { slim?: boolean; cape?: boolean; skinUrl?: string; capeUrl?: string } = {}
+): string {
   const textures: Record<string, unknown> = {
     SKIN: {
-      url: SKIN_URL,
+      url: opts.skinUrl ?? RAW_SKIN_URL,
       ...(opts.slim ? { metadata: { model: "slim" } } : {}),
     },
   };
-  if (opts.cape) textures.CAPE = { url: CAPE_URL };
+  if (opts.cape) textures.CAPE = { url: opts.capeUrl ?? RAW_CAPE_URL };
   return btoa(JSON.stringify({ textures }));
 }
 
@@ -74,6 +78,20 @@ describe("decodeTexturesProperty", () => {
     expect(() => decodeTexturesProperty(btoa(JSON.stringify({ textures: {} })))).toThrow(
       /no skin/i
     );
+  });
+
+  it("rejects a skin URL outside Mojang's texture CDN", () => {
+    expect(() =>
+      decodeTexturesProperty(texturesValue({ skinUrl: "https://example.com/skin.png" }))
+    ).toThrow(/Mojang/);
+  });
+
+  it("rejects a cape URL outside Mojang's texture CDN", () => {
+    expect(() =>
+      decodeTexturesProperty(
+        texturesValue({ cape: true, capeUrl: "https://example.com/cape.png" })
+      )
+    ).toThrow(/Mojang/);
   });
 });
 
