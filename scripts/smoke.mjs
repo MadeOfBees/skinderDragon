@@ -124,13 +124,13 @@ async function setToggle(name, on) {
   if (checked !== on) await lbl.click();
 }
 
-async function generate({ mode = "run", orbit = false, transparent }) {
-  // Mode is a range slider: MODE_ORDER = ["sneak", "run", "fly"] → indices 0/1/2.
-  const modeIndex = { sneak: 0, run: 1, fly: 2 }[mode];
-  await page.locator('input[aria-label="Animation mode"]').fill(String(modeIndex));
+async function generate({ mode = "run", orbit = true, transparent }) {
+  // Pose is a range slider: POSE_ORDER = ["sneak", "stand", "walk", "run", "fly"] → indices 0–4.
+  const modeIndex = { sneak: 0, stand: 1, walk: 2, run: 3, fly: 4 }[mode];
+  await page.locator('input[aria-label="Pose"]').fill(String(modeIndex));
   await setToggle("Orbit", orbit);
   await page.click(`button:has-text("${transparent ? "Transparent" : "Solid"}")`);
-  await page.click('button:has-text("Generate GIF")');
+  await page.click('button:has-text("Generate Render")');
   await page.waitForFunction(
     () => {
       const img = document.querySelector('[data-testid="result-gif"]');
@@ -146,7 +146,7 @@ async function generate({ mode = "run", orbit = false, transparent }) {
   // The result opens in a modal that overlays the controls — close it (Escape)
   // before the next generate() tries to click a mode button beneath it.
   await page.keyboard.press("Escape");
-  await page.waitForSelector('[data-testid="gif-modal"]', { state: "detached", timeout: 5000 });
+  await page.waitForSelector('[data-testid="render-modal"]', { state: "detached", timeout: 5000 });
   return analyzeGif(bytes);
 }
 
@@ -167,25 +167,22 @@ try {
   await loadUser("EthosLab");
   check("loaded EthosLab", true);
 
+  // Cyclic pose + orbit: the primary render path.
   const runSolid = await generate({ mode: "run", transparent: false });
-  check("run + solid → valid looping GIF", runSolid.valid && runSolid.looping, JSON.stringify(runSolid));
+  check("run + orbit + solid → valid looping GIF", runSolid.valid && runSolid.looping, JSON.stringify(runSolid));
 
   const runTransparent = await generate({ mode: "run", transparent: true });
   check(
-    "run + transparent → valid GIF with transparency",
+    "run + orbit + transparent → valid GIF with transparency",
     runTransparent.valid && runTransparent.transparent,
     JSON.stringify(runTransparent)
   );
 
-  // Sneak is a held pose → a cheap single-frame GIF (exercises the non-cyclic path).
-  const sneak = await generate({ mode: "sneak", orbit: false, transparent: false });
-  check("sneak (held pose) → valid GIF", sneak.valid, JSON.stringify(sneak));
-
   // Held pose + orbit: the pose must persist while the wrapper spins (this is the
   // path that breaks if the held pose isn't settled before the orbit driver runs).
-  const sneakOrbit = await generate({ mode: "sneak", orbit: true, transparent: false });
+  const sneakOrbit = await generate({ mode: "sneak", transparent: false });
   check(
-    "sneak + orbit → valid looping GIF",
+    "sneak + orbit (held pose) → valid looping GIF",
     sneakOrbit.valid && sneakOrbit.looping,
     JSON.stringify(sneakOrbit)
   );
@@ -194,7 +191,7 @@ try {
   await loadUser("jeb_");
   check("jeb_ cape detected", !!(await page.$('[data-testid="cape-badge"]')));
 
-  const capeOrbit = await generate({ mode: "run", orbit: true, transparent: false });
+  const capeOrbit = await generate({ mode: "run", transparent: false });
   check("cape + orbit → valid looping GIF", capeOrbit.valid && capeOrbit.looping, JSON.stringify(capeOrbit));
 
   // Reset orbit so SwiftShader isn't compositing a spinning viewport during screenshot.

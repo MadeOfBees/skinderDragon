@@ -2,15 +2,16 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { SkinViewer } from "skinview3d";
 import { loadSkinview3d } from "../lib/skinview";
 import {
-  createModeAnimation,
+  createPoseAnimation,
   applyLoopFrame,
   settleHeldPose,
   captureViewerGif,
+  captureViewerPng,
   isAnimated,
   LOOP_SECONDS,
-  type AnimationMode,
+  type Pose,
   type CaptureOptions,
-  type ModeAnimation,
+  type PoseAnimation,
 } from "../lib/exportGif";
 import type { MinecraftProfile } from "../lib/profile";
 
@@ -31,28 +32,32 @@ export type CaptureRequest = Pick<
 >;
 
 /**
- * Wires the viewer to the selected animation + orbit toggle and returns the
- * {@link ModeAnimation} so the GIF capture can step the same frames by hand.
+ * Wires the viewer to the selected pose + orbit toggle and returns the
+ * {@link PoseAnimation} so the GIF capture can step the same frames by hand.
  */
-async function applyMode(
+async function applyPose(
   viewer: SkinViewer,
-  mode: AnimationMode,
+  pose: Pose,
   orbit: boolean,
   upsideDown: boolean
-): Promise<ModeAnimation> {
+): Promise<PoseAnimation> {
   const sv = await loadSkinview3d();
-  const modeAnim = createModeAnimation(sv, mode);
-  const animated = isAnimated(modeAnim, orbit);
+  const poseAnim = createPoseAnimation(sv, pose);
+  const animated = isAnimated(poseAnim, orbit);
 
   if (animated) {
+    // Capture current wrapper angle so the orbit continues from where it was
+    // instead of snapping back to the front on every toggle.
+    const startY = viewer.playerWrapper.rotation.y;
     // FunctionAnimation.progress advances in real seconds; map to loop phase t ∈ [0,1).
     const driver = new sv.FunctionAnimation((_player, progress) => {
-      applyLoopFrame(viewer, modeAnim, (progress / LOOP_SECONDS) % 1, { orbit, upsideDown });
+      applyLoopFrame(viewer, poseAnim, (progress / LOOP_SECONDS) % 1, { orbit, upsideDown });
+      if (orbit) viewer.playerWrapper.rotation.y += startY;
     });
     viewer.animation = driver; // resets pose/progress
-  } else if (modeAnim.held) {
+  } else if (poseAnim.held) {
     // A held pose with no orbit is a still image (the GIF emits a single frame).
-    viewer.animation = modeAnim.held.anim; // resets pose/progress
+    viewer.animation = poseAnim.held.anim; // resets pose/progress
   }
 
   // Settle a held pose AFTER assigning the animation (the assignment resets the
@@ -61,27 +66,28 @@ async function applyMode(
   // covers a held pose WITH orbit: that runs through the driver above, whose
   // per-frame applyLoopFrame only spins the wrapper and never re-poses the limbs,
   // so without this the crouch/fly would be lost and the player would orbit
-  // standing upright. A no-op for cyclic modes.
-  settleHeldPose(modeAnim, viewer.playerObject);
+  // standing upright. A no-op for cyclic poses.
+  settleHeldPose(poseAnim, viewer.playerObject);
+
+  // RunningAnimation sets basicCapeRotationX = π*0.3 (dramatic wind-blown effect).
+  // Walk is a slow stride — pull the cape back down to near idle (π*0.06).
+  if (pose === "walk") viewer.playerObject.cape.rotation.x = Math.PI * 0.18;
+  if (pose === "fly") viewer.playerObject.position.y = 10;
 
   // Fly sets a non-zero x rotation; negate it so Rz(π) flips belly-up, not belly-down.
-  // No-op for run/sneak where rotation.x is 0.
+  // No-op for run/sneak/stand where rotation.x is 0.
   if (upsideDown) viewer.playerObject.rotation.x = -viewer.playerObject.rotation.x;
 
   // Freeze the settled pose so the live preview doesn't keep advancing it (an
   // un-paused CrouchAnimation would oscillate in and out of the crouch).
-  if (!animated && modeAnim.held) modeAnim.held.anim.paused = true;
-
-  // Orbit leaves the wrapper turned; clear it when orbit is off so a held pose
-  // faces front again.
-  if (!orbit) viewer.playerWrapper.rotation.y = 0;
+  if (!animated && poseAnim.held) poseAnim.held.anim.paused = true;
 
   // Dinnerbone/Grumm easter egg — flip the model. Set last because the animation
   // setter resets rotation.z to 0. For animated+upsideDown, applyLoopFrame also
   // re-asserts Math.PI each frame; the reset-to-0 branch is all that's needed for
   // non-flipped players, since nothing else in the animation pipeline touches rotation.z.
   viewer.playerObject.rotation.z = upsideDown ? Math.PI : 0;
-  return modeAnim;
+  return poseAnim;
 }
 
 /**
@@ -95,7 +101,7 @@ async function applyMode(
  */
 export function usePreview(
   profile: MinecraftProfile | null,
-  mode: AnimationMode,
+  pose: Pose,
   orbit: boolean,
   showNametag: boolean,
   upsideDown: boolean,
@@ -103,7 +109,7 @@ export function usePreview(
 ) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const viewerRef = useRef<SkinViewer | null>(null);
-  const modeAnimRef = useRef<ModeAnimation | null>(null);
+  const poseAnimRef = useRef<PoseAnimation | null>(null);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Resolves when the nametag's custom font is painted; reset to Promise.resolve() when off.
@@ -116,7 +122,7 @@ export function usePreview(
     const canvas = canvasRef.current;
     setReady(false);
     setError(null);
-    modeAnimRef.current = null;
+    poseAnimRef.current = null;
     fontReadyRef.current = Promise.resolve();
     if (!profile || !canvas) return;
 
@@ -148,7 +154,7 @@ export function usePreview(
         if (profile.capeUrl) await viewer.loadCape(profile.capeUrl);
         if (cancelled) return;
 
-        modeAnimRef.current = await applyMode(viewer, mode, orbit, upsideDown);
+        poseAnimRef.current = await applyPose(viewer, pose, orbit, upsideDown);
         if (!cancelled) setReady(true);
       } catch {
         activeViewer?.dispose();
@@ -175,11 +181,11 @@ export function usePreview(
     let cancelled = false;
     setReady(false);
     setError(null);
-    modeAnimRef.current = null;
-    void applyMode(viewer, mode, orbit, upsideDown)
+    poseAnimRef.current = null;
+    void applyPose(viewer, pose, orbit, upsideDown)
       .then((ma) => {
         if (!cancelled) {
-          modeAnimRef.current = ma;
+          poseAnimRef.current = ma;
           setReady(true);
         }
       })
@@ -191,20 +197,21 @@ export function usePreview(
     return () => {
       cancelled = true;
     };
-  }, [mode, orbit, upsideDown]);
+  }, [pose, orbit, upsideDown]);
 
   // Render the GIF from the live viewer itself. orbit/flip come from the hook's
   // current state; everything else (skin, cape, nametag, camera) is whatever the
   // preview is showing right now.
-  const captureGif = useCallback(
+  const captureRender = useCallback(
     async (req: CaptureRequest): Promise<Blob> => {
       const viewer = viewerRef.current;
-      const modeAnim = modeAnimRef.current;
-      if (!viewer || !modeAnim || !ready) {
+      const poseAnim = poseAnimRef.current;
+      if (!viewer || !poseAnim || !ready) {
         throw new Error("Preview is not ready yet.");
       }
       await fontReadyRef.current; // ensure nametag font is painted before first frame
-      return captureViewerGif(viewer, modeAnim, { ...req, orbit, upsideDown });
+      const capture = orbit ? captureViewerGif : captureViewerPng;
+      return capture(viewer, poseAnim, { ...req, orbit, upsideDown });
     },
     [orbit, ready, upsideDown]
   );
@@ -249,5 +256,5 @@ export function usePreview(
     };
   }, [showNametag, profile, upsideDown]);
 
-  return { canvasRef, captureGif, ready, error };
+  return { canvasRef, captureRender, ready, error };
 }

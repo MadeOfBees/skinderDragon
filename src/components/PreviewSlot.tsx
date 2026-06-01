@@ -10,7 +10,7 @@ interface PreviewSlotProps {
 export function PreviewSlot({ children, className }: PreviewSlotProps) {
   return (
     <div className="mc-slot p-2">
-      <div className={["checkerboard overflow-hidden leading-none", className].filter(Boolean).join(" ")}>
+      <div className={["checkerboard overflow-hidden leading-none size-85", className].filter(Boolean).join(" ")}>
         {children}
       </div>
     </div>

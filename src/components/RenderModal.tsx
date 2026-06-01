@@ -2,15 +2,16 @@ import { Modal } from "./Modal";
 import { PreviewSlot } from "./PreviewSlot";
 import { DownloadIcon } from "../icons/DownloadIcon";
 
-export interface GifModalProps {
+export interface RenderModalProps {
   open: boolean;
   generating: boolean;
   progress: number;
   gifUrl: string | null;
   username: string;
-  /** Human-readable mode label, e.g. "Run". */
-  modeLabel: string;
+  /** Human-readable pose label, e.g. "Run". */
+  poseLabel: string;
   orbit: boolean;
+  format: "gif" | "png";
   /** Square pixel dimension of the exported GIF, e.g. 512. */
   size: number;
   downloadName: string;
@@ -18,28 +19,29 @@ export interface GifModalProps {
   onCancel: () => void;
 }
 
-export function GifModal({
+export function RenderModal({
   open,
   generating,
   progress,
   gifUrl,
   username,
-  modeLabel,
+  poseLabel,
   orbit,
+  format,
   size,
   downloadName,
   onClose,
   onCancel,
-}: GifModalProps) {
+}: RenderModalProps) {
   return (
     <Modal
       open={open}
-      title={generating ? "Rendering…" : "Your GIF"}
-      ariaLabel="Generated GIF"
+      title={generating ? "Rendering…" : "Your Render"}
+      ariaLabel="Generated render"
       onClose={onClose}
       disabled={generating}
       panelClassName="flex flex-col items-center"
-      testId="gif-modal"
+      testId="render-modal"
     >
       <div className="mc-modal-body flex w-full flex-col items-center">
         <PreviewSlot className="relative">
@@ -47,11 +49,11 @@ export function GifModal({
             <img
               data-testid="result-gif"
               src={gifUrl}
-              alt={`${username} ${modeLabel} animation`}
-              className="pixelated block h-64 w-64"
+              alt={`${username} ${poseLabel} ${format === "gif" ? "animation" : "render"}`}
+              className="pixelated block w-full h-full"
             />
           ) : (
-            <div className="grid h-64 w-64 place-items-center text-sm text-muted">
+            <div className="grid w-full h-full place-items-center text-sm text-muted">
               {Math.round(progress * 100)}%
             </div>
           )}
@@ -73,7 +75,7 @@ export function GifModal({
         ) : (
           <>
             <p className="mt-3 text-[0.7rem] text-muted">
-              {username} · {modeLabel}
+              {username} · {poseLabel}
               {orbit ? " + Orbit" : ""} · {size}×{size}
             </p>
             {gifUrl && (
@@ -83,7 +85,7 @@ export function GifModal({
                 download={downloadName}
                 className="mc-btn mc-btn-green mc-btn-hero mt-4 block w-full text-center"
               >
-                <DownloadIcon /> Download GIF
+                <DownloadIcon /> Download {format.toUpperCase()}
               </a>
             )}
           </>

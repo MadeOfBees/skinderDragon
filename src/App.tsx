@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode, type SyntheticEvent } from "react";
 import { fetchProfile, ProfileError, type MinecraftProfile } from "./lib/profile";
-import { type AnimationMode, DEFAULT_GIF_SIZE } from "./lib/exportGif";
+import { type Pose, DEFAULT_GIF_SIZE } from "./lib/exportGif";
 import { Panorama, type PanoramaSource } from "./components/Panorama";
 import { Settings } from "./components/Settings";
-import { GifModal } from "./components/GifModal";
+import { RenderModal } from "./components/RenderModal";
 import { SearchBar } from "./components/SearchBar";
 import { PreviewSlot } from "./components/PreviewSlot";
 import { Switch } from "./components/Switch";
@@ -28,9 +28,11 @@ function ControlGroup({ label, children }: { label: string; children: ReactNode 
   );
 }
 
-const MODE_ORDER: AnimationMode[] = ["sneak", "run", "fly"];
-const MODE_LABELS: Record<AnimationMode, string> = {
+const POSE_ORDER: Pose[] = ["sneak", "stand", "walk", "run", "fly"];
+const POSE_LABELS: Record<Pose, string> = {
   sneak: "Crouch",
+  stand: "Stand",
+  walk: "Walk",
   run: "Run",
   fly: "Fly",
 };
@@ -59,8 +61,8 @@ export function App() {
   const [headUrl, setHeadUrl] = useState<string | null>(null);
   const [capeUrl, setCapeUrl] = useState<string | null>(null);
 
-  const [mode, setMode] = useState<AnimationMode>("run");
-  const [orbit, setOrbit] = useState(false);
+  const [pose, setPose] = useState<Pose>("stand");
+  const [orbit, setOrbit] = useState(true);
   const [showNametag, setShowNametag] = useState(false);
   const [bgKind, setBgKind] = useState<"transparent" | "color">("color");
   const [bgColor, setBgColor] = useState("#1d2030");
@@ -72,15 +74,15 @@ export function App() {
   const [generating, setGenerating] = useState(false);
   const [progress, setProgress] = useState(0);
   const [gifUrl, setGifUrl] = useState<string | null>(null);
-  const [gifModalOpen, setGifModalOpen] = useState(false);
+  const [renderModalOpen, setRenderModalOpen] = useState(false);
 const generationAbortRef = useRef<AbortController | null>(null);
 
   const [splash] = useState(randomSplash);
 
   const upsideDown = !!profile && FLIP_NAMES.test(profile.username);
-  const { canvasRef, captureGif, ready: previewReady, error: previewError } = usePreview(
+  const { canvasRef, captureRender, ready: previewReady, error: previewError } = usePreview(
     profile,
-    mode,
+    pose,
     orbit,
     showNametag,
     upsideDown,
@@ -137,7 +139,7 @@ const generationAbortRef = useRef<AbortController | null>(null);
   }, [gifUrl]);
 
   const closeSettings = useCallback(() => setSettingsOpen(false), []);
-  const closeGifModal = useCallback(() => setGifModalOpen(false), []);
+  const closeRenderModal = useCallback(() => setRenderModalOpen(false), []);
 const cancelGeneration = useCallback(() => {
     generationAbortRef.current?.abort();
   }, []);
@@ -160,7 +162,7 @@ const cancelGeneration = useCallback(() => {
     setError(null);
     setLoading(true);
     setGifUrl(null);
-    setGifModalOpen(false);
+    setRenderModalOpen(false);
     try {
       setProfile(await fetchProfile(username, edition));
     } catch (err) {
@@ -180,12 +182,12 @@ const cancelGeneration = useCallback(() => {
     setGenerating(true);
     setProgress(0);
     setGifUrl(null);
-    setGifModalOpen(true);
+    setRenderModalOpen(true);
     const abort = new AbortController();
     generationAbortRef.current = abort;
     try {
       // The GIF is captured from the live preview viewer — WYSIWYG.
-      const blob = await captureGif({
+      const blob = await captureRender({
         background: bgKind === "color" ? { kind: "color", color: bgColor } : { kind: "transparent" },
         onProgress: setProgress,
         signal: abort.signal,
@@ -194,22 +196,24 @@ const cancelGeneration = useCallback(() => {
       setGifUrl(URL.createObjectURL(blob));
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") {
-        setGifModalOpen(false);
+        setRenderModalOpen(false);
         return;
       }
       console.error(err);
       setError("Failed to generate the GIF. See the console for details.");
-      setGifModalOpen(false);
+      setRenderModalOpen(false);
     } finally {
       generationAbortRef.current = null;
       setGenerating(false);
     }
   }
 
+  const renderFormat = orbit ? "gif" : "png";
+
   let generateLabel = "Loading preview…";
-  if (generating) generateLabel = `Generating… ${Math.round(progress * 100)}%`;
+  if (generating) generateLabel = `Rendering… ${Math.round(progress * 100)}%`;
   else if (previewError) generateLabel = "Preview unavailable";
-  else if (previewReady) generateLabel = "Generate GIF";
+  else if (previewReady) generateLabel = "Generate Render";
 
   return (
     <>
@@ -232,17 +236,18 @@ const cancelGeneration = useCallback(() => {
         onEdition={changeEdition}
       />
       {profile && (
-        <GifModal
-          open={gifModalOpen}
+        <RenderModal
+          open={renderModalOpen}
           generating={generating}
           progress={progress}
           gifUrl={gifUrl}
           username={profile.username}
-          modeLabel={MODE_LABELS[mode]}
+          poseLabel={POSE_LABELS[pose]}
           orbit={orbit}
           size={GIF_OVERRIDES.size ?? DEFAULT_GIF_SIZE}
-          downloadName={`${profile.username}-${mode}${orbit ? "-orbit" : ""}.gif`}
-          onClose={closeGifModal}
+          format={renderFormat}
+          downloadName={`${profile.username}-${pose}${orbit ? "-orbit" : ""}.${renderFormat}`}
+          onClose={closeRenderModal}
           onCancel={cancelGeneration}
         />
       )}
@@ -327,13 +332,13 @@ const cancelGeneration = useCallback(() => {
             <div className="flex w-full max-w-90 flex-col gap-4">
               <ControlGroup label="Animation">
                 <Slider
-                  label="Mode"
-                  value={MODE_ORDER.indexOf(mode)}
+                  label="Pose"
+                  value={POSE_ORDER.indexOf(pose)}
                   min={0}
-                  max={2}
-                  valueLabel={MODE_LABELS[mode]}
-                  onChange={(i: number) => setMode(MODE_ORDER[i])}
-                  ariaLabel="Animation mode"
+                  max={4}
+                  valueLabel={POSE_LABELS[pose]}
+                  onChange={(i: number) => setPose(POSE_ORDER[i])}
+                  ariaLabel="Pose"
                 />
                 <div className="mt-2 flex flex-col">
                   <Switch label="Orbit" checked={orbit} onChange={() => setOrbit((o) => !o)} />

@@ -3,7 +3,7 @@ import type { PlayerObject, SkinViewer } from "skinview3d";
 import type { Group } from "three";
 import { loadSkinview3d } from "./skinview";
 
-export type AnimationMode = "run" | "sneak" | "fly";
+export type Pose = "run" | "walk" | "sneak" | "fly" | "stand";
 
 export type Background =
   | { kind: "transparent" }
@@ -31,12 +31,17 @@ export const DEFAULT_FPS = 12;
 /** Seconds per loop at the default rate — used by the live preview clock. */
 export const LOOP_SECONDS = DEFAULT_FRAMES / DEFAULT_FPS;
 
-// RunningAnimation drives limbs with cos(progress * 15); one full cycle = 2π/15.
-const RUN_CYCLE = (2 * Math.PI) / 15;
+// RunningAnimation: t = progress*15 + π/2
+// Walk at π/20 → t=3π/4+π/2=5π/4: arms ±43° (other stride), body grounded
+// Run at π/60 → t=3π/4: arms ±61°, body at y=0
+const WALK_POSE = Math.PI / 120;
+const RUN_POSE = Math.PI / 60;
 // CrouchAnimation.showProgress reaches full crouch at progress = 0.125.
 const CROUCH_POSE = 0.125;
 // FlyingAnimation fully extends by ~progress 0.5; overshoot slightly to be safe.
 const FLY_POSE = 1.5;
+// IdleAnimation at progress=0: neutral standing with arms naturally away from the body.
+const STAND_POSE = 0;
 
 /** Player y-rotation (rad) at loop phase t — one full orbit over t ∈ [0, 1). */
 export function orbitRotationForPhase(t: number): number {
@@ -126,33 +131,23 @@ export interface LoopTargets {
 export type CycleFn = (targets: LoopTargets, t: number) => void;
 
 /**
- * A resolved mode animation. Cyclic modes have a CycleFn driven per frame;
+ * A resolved pose animation. Cyclic poses have a CycleFn driven per frame;
  * held poses store the animation and progress value to freeze at.
  * Exactly one of `cycle` / `held` is non-null.
  */
-export interface ModeAnimation {
+export interface PoseAnimation {
   cycle: CycleFn | null;
   held: { anim: InstanceType<Skinview3d["PlayerAnimation"]>; pose: number } | null;
 }
 
-/** True when the mode+orbit combination produces a multi-frame animation. */
-export function isAnimated(modeAnim: ModeAnimation, orbit: boolean): boolean {
-  return modeAnim.cycle !== null || orbit;
+/** True when the pose+orbit combination produces a multi-frame animation. */
+export function isAnimated(poseAnim: PoseAnimation, orbit: boolean): boolean {
+  return poseAnim.cycle !== null || orbit;
 }
 
-function driveCycle(
-  anim: InstanceType<Skinview3d["PlayerAnimation"]>,
-  cycleProgress: number
-): CycleFn {
-  return (targets, t) => {
-    anim.progress = t * cycleProgress;
-    anim.update(targets.playerObject, 0);
-  };
-}
-
-/** Maps a mode to its animation. Single source of truth shared by preview and export. */
-export function createModeAnimation(sv: Skinview3d, mode: AnimationMode): ModeAnimation {
-  switch (mode) {
+/** Maps a pose to its animation. Single source of truth shared by preview and export. */
+export function createPoseAnimation(sv: Skinview3d, pose: Pose): PoseAnimation {
+  switch (pose) {
     case "sneak": {
       const anim = new sv.CrouchAnimation();
       anim.showProgress = true; // smooth depth, not the stepwise floor
@@ -160,33 +155,93 @@ export function createModeAnimation(sv: Skinview3d, mode: AnimationMode): ModeAn
     }
     case "fly":
       return { cycle: null, held: { anim: new sv.FlyingAnimation(), pose: FLY_POSE } };
+    case "stand":
+      return { cycle: null, held: { anim: new sv.IdleAnimation(), pose: STAND_POSE } };
+    case "walk":
+      return { cycle: null, held: { anim: new sv.RunningAnimation(), pose: WALK_POSE } };
     case "run":
     default:
-      return { cycle: driveCycle(new sv.RunningAnimation(), RUN_CYCLE), held: null };
+      return { cycle: null, held: { anim: new sv.RunningAnimation(), pose: RUN_POSE } };
   }
 }
 
 /**
  * Settles a held pose once. Must be called after assigning the animation to the
- * viewer — assignment resets joints. No-op for cyclic modes.
+ * viewer — assignment resets joints. No-op for cyclic poses.
  */
-export function settleHeldPose(modeAnim: ModeAnimation, playerObject: PlayerObject): void {
-  if (modeAnim.held) {
-    modeAnim.held.anim.progress = modeAnim.held.pose;
-    modeAnim.held.anim.update(playerObject, 0);
+export function settleHeldPose(poseAnim: PoseAnimation, playerObject: PlayerObject): void {
+  if (poseAnim.held) {
+    poseAnim.held.anim.progress = poseAnim.held.pose;
+    poseAnim.held.anim.update(playerObject, 0);
   }
 }
 
 /** Positions the player for one loop frame at phase t ∈ [0, 1). */
 export function applyLoopFrame(
   targets: LoopTargets,
-  modeAnim: ModeAnimation,
+  poseAnim: PoseAnimation,
   t: number,
   opts: { orbit: boolean; upsideDown: boolean }
 ): void {
-  modeAnim.cycle?.(targets, t);
+  poseAnim.cycle?.(targets, t);
   if (opts.orbit) targets.playerWrapper.rotation.y = orbitRotationForPhase(t);
   if (opts.upsideDown) targets.playerObject.rotation.z = Math.PI;
+}
+
+/** Resizes the viewer's drawing buffer and returns a cleanup thunk. */
+function resizeViewer(viewer: SkinViewer, size: number) {
+  const renderer = viewer.renderer;
+  const prev = {
+    width: viewer.width,
+    height: viewer.height,
+    pixelRatio: renderer.getPixelRatio(),
+    background: viewer.background,
+    renderPaused: viewer.renderPaused,
+  };
+  viewer.renderPaused = true;
+  renderer.setPixelRatio(1);
+  renderer.setSize(size, size, false);
+  viewer.composer.setPixelRatio(1);
+  viewer.composer.setSize(size, size);
+  viewer.fxaaPass.material.uniforms["resolution"].value.set(1 / size, 1 / size);
+  return prev;
+}
+
+function restoreViewer(viewer: SkinViewer, prev: ReturnType<typeof resizeViewer>) {
+  viewer.background = prev.background;
+  viewer.renderer.setPixelRatio(prev.pixelRatio);
+  viewer.setSize(prev.width, prev.height);
+  viewer.renderPaused = prev.renderPaused;
+}
+
+/**
+ * Captures a single PNG frame from the live preview viewer.
+ * Only the drawing buffer is resized so the on-screen layout never shifts.
+ */
+export async function captureViewerPng(
+  viewer: SkinViewer,
+  poseAnim: PoseAnimation,
+  opts: CaptureOptions
+): Promise<Blob> {
+  const { upsideDown, background, size = DEFAULT_GIF_SIZE, onProgress, signal } = opts;
+  const prev = resizeViewer(viewer, size);
+  try {
+    throwIfAborted(signal);
+    viewer.background = background.kind === "color" ? background.color : null;
+    applyLoopFrame(viewer, poseAnim, 0, { orbit: false, upsideDown });
+    viewer.render();
+    throwIfAborted(signal);
+    const blob = await new Promise<Blob>((resolve, reject) => {
+      viewer.canvas.toBlob(
+        (b) => (b ? resolve(b) : reject(new Error("canvas.toBlob returned null"))),
+        "image/png"
+      );
+    });
+    onProgress?.(1);
+    return blob;
+  } finally {
+    restoreViewer(viewer, prev);
+  }
 }
 
 /**
@@ -196,7 +251,7 @@ export function applyLoopFrame(
  */
 export async function captureViewerGif(
   viewer: SkinViewer,
-  modeAnim: ModeAnimation,
+  poseAnim: PoseAnimation,
   opts: CaptureOptions
 ): Promise<Blob> {
   const {
@@ -210,14 +265,7 @@ export async function captureViewerGif(
     signal,
   } = opts;
 
-  const renderer = viewer.renderer;
-  const prev = {
-    width: viewer.width,
-    height: viewer.height,
-    pixelRatio: renderer.getPixelRatio(),
-    background: viewer.background,
-    renderPaused: viewer.renderPaused,
-  };
+  const prev = resizeViewer(viewer, size);
 
   const capture = document.createElement("canvas");
   capture.width = size;
@@ -226,23 +274,15 @@ export async function captureViewerGif(
   const gif = GIFEncoder();
   const delay = Math.round(1000 / fps);
 
-  // A held pose with no orbit is a still image — one frame is enough.
-  const frameCount = isAnimated(modeAnim, orbit) ? frames : 1;
+  const frameCount = frames;
 
   try {
     throwIfAborted(signal);
-    // Resize the viewer's drawing buffer to export dimensions; CSS layout unchanged.
-    viewer.renderPaused = true; // we drive every frame by hand
-    renderer.setPixelRatio(1);
-    renderer.setSize(size, size, false); // false = don't touch canvas CSS
-    viewer.composer.setPixelRatio(1);
-    viewer.composer.setSize(size, size);
-    viewer.fxaaPass.material.uniforms["resolution"].value.set(1 / size, 1 / size);
     viewer.background = background.kind === "color" ? background.color : null;
 
     for (let i = 0; i < frameCount; i++) {
       throwIfAborted(signal);
-      applyLoopFrame(viewer, modeAnim, i / frameCount, { orbit, upsideDown });
+      applyLoopFrame(viewer, poseAnim, i / frameCount, { orbit, upsideDown });
       viewer.render();
 
       ctx.clearRect(0, 0, size, size);
@@ -262,10 +302,6 @@ export async function captureViewerGif(
     const bytes = gif.bytes();
     return new Blob([bytes as BlobPart], { type: "image/gif" }); // gifenc returns a plain buffer; cast is safe
   } finally {
-    // Restore pixel ratio before setSize so buffers rebuild at the right scale.
-    viewer.background = prev.background;
-    renderer.setPixelRatio(prev.pixelRatio);
-    viewer.setSize(prev.width, prev.height);
-    viewer.renderPaused = prev.renderPaused;
+    restoreViewer(viewer, prev);
   }
 }
