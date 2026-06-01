@@ -1,5 +1,5 @@
 import { useEffect, useRef, type ReactNode } from "react";
-import { CloseIcon } from "./CloseIcon";
+import { CloseIcon } from "../icons/CloseIcon";
 
 interface ModalProps {
   open: boolean;
@@ -115,7 +115,7 @@ export function Modal({
             onClick={onClose}
             disabled={disabled}
             aria-label="Close"
-            className="mc-btn mc-btn-stone mc-btn-icon"
+            className="mc-btn mc-btn-stone mc-btn-icon mc-btn-close"
           >
             <CloseIcon />
           </button>
