@@ -13,6 +13,7 @@
 //   node scripts/refresh-assets.mjs --snapshot   # snapshot panorama only
 //   node scripts/refresh-assets.mjs 1.21.4 release  # pin a version → release/
 //   node scripts/refresh-assets.mjs --ensure     # skip if all files already present
+//   node scripts/refresh-assets.mjs --ensure --strict  # fail if missing assets cannot be fetched
 //
 // Panorama faces are heavily blurred/darkened behind the UI, so we downscale
 // to keep the bundle small. Bump EDGE if you ever want crisper faces.
@@ -171,7 +172,8 @@ async function refreshFavicon() {
 async function main() {
   const args = process.argv.slice(2);
   const ensure = args.includes("--ensure");
-  const rest = args.filter((a) => a !== "--ensure");
+  const strict = args.includes("--strict");
+  const rest = args.filter((a) => a !== "--ensure" && a !== "--strict");
 
   if (ensure) {
     const panoramaOk =
@@ -183,7 +185,8 @@ async function main() {
       return;
     }
 
-    // Some files are missing — try to download, but don't block startup on CDN failures.
+    // Some files are missing — try to download. Dev startup uses soft ensure;
+    // production builds pass --strict so they fail instead of shipping without assets.
     try {
       if (!panoramaOk) {
         console.log("→ Fetching version manifest…");
@@ -196,6 +199,7 @@ async function main() {
       if (!faviconOk) await refreshFavicon();
       console.log("\n✅ Assets ready.");
     } catch (err) {
+      if (strict) throw err;
       console.warn(
         "⚠️  Asset ensure failed (CDN unavailable?) — starting without some assets.\n  ",
         err.message

@@ -14,6 +14,7 @@ export interface GifModalProps {
   size: number;
   downloadName: string;
   onClose: () => void;
+  onCancel: () => void;
 }
 
 export function GifModal({
@@ -27,6 +28,7 @@ export function GifModal({
   size,
   downloadName,
   onClose,
+  onCancel,
 }: GifModalProps) {
   return (
     <Modal
@@ -55,9 +57,18 @@ export function GifModal({
         </PreviewSlot>
 
         {generating ? (
-          <div className="mc-xp mt-4 w-full">
-            <div className="mc-xp-fill" style={{ width: `${progress * 100}%` }} />
-          </div>
+          <>
+            <div className="mc-xp mt-4 w-full">
+              <div className="mc-xp-fill" style={{ width: `${progress * 100}%` }} />
+            </div>
+            <button
+              type="button"
+              onClick={onCancel}
+              className="mc-btn mc-btn-stone mt-4 w-full text-[0.8rem]"
+            >
+              Cancel
+            </button>
+          </>
         ) : (
           <>
             <p className="mt-3 text-[0.7rem] text-muted">

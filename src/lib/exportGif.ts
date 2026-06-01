@@ -22,6 +22,7 @@ export interface CaptureOptions {
   /** Frames per second. @default 12 */
   fps?: number;
   onProgress?: (fraction: number) => void;
+  signal?: AbortSignal;
 }
 
 export const DEFAULT_GIF_SIZE = 512;
@@ -52,6 +53,37 @@ export function pickTransparentIndex(palette: number[][]): number {
 
 const yieldToUi = () => new Promise<void>((r) => setTimeout(r, 0));
 
+function throwIfAborted(signal?: AbortSignal): void {
+  if (signal?.aborted) {
+    throw new DOMException("GIF generation was cancelled.", "AbortError");
+  }
+}
+
+function writeFrameToGif(
+  gif: ReturnType<typeof GIFEncoder>,
+  data: Uint8ClampedArray | Uint8Array,
+  opts: {
+    size: number;
+    delay: number;
+    background: Background;
+  }
+): void {
+  const { size, delay, background } = opts;
+  const transparent = background.kind === "transparent";
+  const format = frameFormat(background);
+  const palette = quantize(data, 256, { format, oneBitAlpha: transparent });
+  const index = applyPalette(data, palette, format);
+  const transparentIndex = transparent ? pickTransparentIndex(palette) : -1;
+
+  gif.writeFrame(index, size, size, {
+    palette,
+    delay,
+    repeat: 0,
+    transparent: transparent && transparentIndex >= 0,
+    transparentIndex: transparentIndex >= 0 ? transparentIndex : undefined,
+  });
+}
+
 /** Encodes pre-captured RGBA frames into a looping GIF. DOM-free and unit-testable. */
 export async function encodeFramesToGif(
   frames: Array<Uint8ClampedArray | Uint8Array>,
@@ -60,30 +92,22 @@ export async function encodeFramesToGif(
     fps: number;
     background: Background;
     onProgress?: (fraction: number) => void;
+    signal?: AbortSignal;
   }
 ): Promise<Uint8Array> {
-  const { size, fps, background, onProgress } = opts;
+  const { size, fps, background, onProgress, signal } = opts;
   const gif = GIFEncoder();
   const delay = Math.round(1000 / fps);
-  const transparent = background.kind === "transparent";
-  const format = frameFormat(background);
 
   for (let i = 0; i < frames.length; i++) {
-    const data = frames[i];
-    const palette = quantize(data, 256, { format, oneBitAlpha: transparent });
-    const index = applyPalette(data, palette, format);
-    const transparentIndex = transparent ? pickTransparentIndex(palette) : -1;
-
-    gif.writeFrame(index, size, size, {
-      palette,
-      delay,
-      repeat: 0,
-      transparent: transparent && transparentIndex >= 0,
-      transparentIndex: transparentIndex >= 0 ? transparentIndex : undefined,
-    });
+    throwIfAborted(signal);
+    writeFrameToGif(gif, frames[i], { size, delay, background });
 
     onProgress?.((i + 1) / frames.length);
-    if (i % 4 === 3) await yieldToUi();
+    if (i % 4 === 3) {
+      await yieldToUi();
+      throwIfAborted(signal);
+    }
   }
 
   gif.finish();
@@ -183,6 +207,7 @@ export async function captureViewerGif(
     frames = DEFAULT_FRAMES,
     fps = DEFAULT_FPS,
     onProgress,
+    signal,
   } = opts;
 
   const renderer = viewer.renderer;
@@ -198,11 +223,14 @@ export async function captureViewerGif(
   capture.width = size;
   capture.height = size;
   const ctx = capture.getContext("2d", { willReadFrequently: true })!;
+  const gif = GIFEncoder();
+  const delay = Math.round(1000 / fps);
 
   // A held pose with no orbit is a still image — one frame is enough.
   const frameCount = isAnimated(modeAnim, orbit) ? frames : 1;
 
   try {
+    throwIfAborted(signal);
     // Resize the viewer's drawing buffer to export dimensions; CSS layout unchanged.
     viewer.renderPaused = true; // we drive every frame by hand
     renderer.setPixelRatio(1);
@@ -212,25 +240,26 @@ export async function captureViewerGif(
     viewer.fxaaPass.material.uniforms["resolution"].value.set(1 / size, 1 / size);
     viewer.background = background.kind === "color" ? background.color : null;
 
-    const rgbaFrames: Uint8ClampedArray[] = [];
     for (let i = 0; i < frameCount; i++) {
+      throwIfAborted(signal);
       applyLoopFrame(viewer, modeAnim, i / frameCount, { orbit, upsideDown });
       viewer.render();
 
       ctx.clearRect(0, 0, size, size);
       ctx.drawImage(viewer.canvas, 0, 0, size, size);
-      rgbaFrames.push(ctx.getImageData(0, 0, size, size).data);
+      writeFrameToGif(gif, ctx.getImageData(0, 0, size, size).data, {
+        size,
+        delay,
+        background,
+      });
 
-      onProgress?.((i + 1) / frameCount / 2); // first half of total progress
+      onProgress?.((i + 1) / frameCount);
       await yieldToUi();
     }
 
-    const bytes = await encodeFramesToGif(rgbaFrames, {
-      size,
-      fps,
-      background,
-      onProgress: (f) => onProgress?.(0.5 + f / 2),
-    });
+    throwIfAborted(signal);
+    gif.finish();
+    const bytes = gif.bytes();
     return new Blob([bytes as BlobPart], { type: "image/gif" }); // gifenc returns a plain buffer; cast is safe
   } finally {
     // Restore pixel ratio before setSize so buffers rebuild at the right scale.

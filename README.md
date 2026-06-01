@@ -148,7 +148,7 @@ to get them in place. See [Assets](#assets) below for what these are and why the
 
 ```bash
 npm run dev          # dev server with HMR → http://localhost:5173
-npm run build        # type-check + production build to dist/
+npm run build        # ensure assets + type-check + production build to dist/
 npm run preview      # serve the production build locally
 
 npm run verify       # fast gate: tsc --noEmit + vitest (no browser) — run after every change
@@ -159,6 +159,7 @@ npm run test:coverage
 
 npm run assets:refresh   # (re)download panorama faces + favicon from Mojang's CDN
 npm run assets:ensure    # download only what's missing (used by dev/smoke/deploy)
+npm run assets:build     # strict asset ensure used by production builds
 ```
 
 `verify` is the routine gate; `smoke` is on-demand for WebGL / GIF / panorama changes.
@@ -176,9 +177,9 @@ git** (`public/panorama/`, `public/favicon.png` are gitignored):
 [`scripts/refresh-assets.mjs`](scripts/refresh-assets.mjs) walks Mojang's version
 manifest → version JSON → asset index → object hashes to find the current panorama, and
 reuses the playerdb pipeline for Steve's face. `npm run dev`, `npm run smoke`, and the
-Pages deploy all fetch these automatically; a bare `npm run build` does **not**, which is
-why the deploy runs `assets:refresh` as its own step. Without the files the site still
-builds — it just ships without a panorama or default favicon.
+Pages deploy all fetch these automatically. `npm run build` runs a strict asset ensure
+first, so missing assets fail the build instead of shipping without a panorama or default
+favicon.
 
 ## Project structure
 
