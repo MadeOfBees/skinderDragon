@@ -124,7 +124,7 @@ async function setToggle(name, on) {
   if (checked !== on) await lbl.click();
 }
 
-async function generate({ mode = "run", orbit = true, transparent }) {
+async function generate({ mode = "stand", orbit = true, transparent }) {
   // Pose is a range slider: POSE_ORDER = ["sneak", "stand", "walk", "run", "fly"] → indices 0–4.
   const modeIndex = { sneak: 0, stand: 1, walk: 2, run: 3, fly: 4 }[mode];
   await page.locator('input[aria-label="Pose"]').fill(String(modeIndex));
@@ -163,11 +163,11 @@ try {
   });
   check("WebGL available", webgl);
 
-  // --- Skin without a cape: cover the cyclic, transparent, and held-pose paths.
+  // --- Skin without a cape: cover solid, transparent, and a dramatically-shaped pose.
   await loadUser("EthosLab");
   check("loaded EthosLab", true);
 
-  // Cyclic pose + orbit: the primary render path.
+  // All poses are held snapshots; orbit is the sole source of motion in the GIF.
   const runSolid = await generate({ mode: "run", transparent: false });
   check("run + orbit + solid → valid looping GIF", runSolid.valid && runSolid.looping, JSON.stringify(runSolid));
 
@@ -178,8 +178,8 @@ try {
     JSON.stringify(runTransparent)
   );
 
-  // Held pose + orbit: the pose must persist while the wrapper spins (this is the
-  // path that breaks if the held pose isn't settled before the orbit driver runs).
+  // Sneak has a dramatically different silhouette — if pose settling fails the player
+  // orbits upright instead of crouched, which would be immediately obvious.
   const sneakOrbit = await generate({ mode: "sneak", transparent: false });
   check(
     "sneak + orbit (held pose) → valid looping GIF",

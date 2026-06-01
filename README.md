@@ -6,16 +6,18 @@
 [![Live demo](https://img.shields.io/badge/demo-live-brightgreen?style=flat-square)](https://madeofbees.github.io/skinderDragon/)
 [![License](https://img.shields.io/github/license/MadeOfBees/skinderDragon?style=flat-square)](LICENSE)
 
-**Minecraft usernames in, looping 3D skin GIFs out — rendered and encoded 100% in your browser.**
+**Minecraft usernames in, 3D skin renders out — GIF or PNG, 100% in your browser.**
 
 [**▶ Open the live demo**](https://madeofbees.github.io/skinderDragon/)
 
 </div>
 
-Turn a Minecraft player into a looping skin GIF. Type a username (Java) or gamertag
+Turn a Minecraft player into a skin render. Type a username (Java) or gamertag
 (Bedrock) and skinderdragon renders that player's skin **and cape** on a draggable 3D
-model, then exports a seamless animated GIF — **running**, **crouching**, or **flying**,
-optionally **orbiting** a full 360° while a Minecraft title-screen panorama drifts behind it.
+model, then exports a **512×512 GIF or PNG** — posed as **standing**, **walking**,
+**running**, **crouching**, or **flying**, with an optional **orbit** that spins the
+model a full 360° while a Minecraft title-screen panorama drifts behind it. Orbit on
+exports a looping GIF; orbit off exports a clean PNG.
 
 It runs entirely in the browser. No backend, no uploads — the skin/cape PNGs come
 straight from Mojang's official texture CDN and everything is rendered and encoded
@@ -45,18 +47,19 @@ client-side.
 - 🎮 **Java *and* Bedrock** — switch editions in Settings. Java lookups go through
   playerdb; Bedrock gamertags resolve through the GeyserMC Global API.
 - 🧥 **Capes** are fetched and rendered automatically, with a live cape-front badge.
-- 🏃 **Three animations** — a seamless run cycle, a held crouch, and a held flying pose.
-- 🔄 **Orbit** — an independent toggle that spins the model a full turn, combinable with
-  any mode. (A held pose with orbit off is exported as a single still frame.)
-- 🏷️ **Floating nametag** in Minecraft's pixel font, rendered into the GIF.
+- 🏃 **Five poses** — Stand, Walk, Run, Crouch, and Fly. Each is a posed snapshot of the
+  skinview3d model settled at a characteristic frame of its animation.
+- 🔄 **Orbit** — an independent toggle that spins the model a full 360°, combinable with
+  any pose. Orbit on → looping GIF; orbit off → still PNG.
+- 🏷️ **Floating nametag** in Minecraft's pixel font, rendered into the GIF or PNG.
 - 🎨 **Background** — solid color (with a picker) or transparent.
 - 🌄 **Animated panorama** — the real Minecraft title-screen background (release or
   snapshot channel), drifting behind the UI and rendering a single static frame for
   reduced-motion users.
 - 🖱️ **Live preview you can drag** — and the GIF is captured from *that exact viewer*,
   so what you see is what you download.
-- 💾 **One-click downloads** — a looping 512×512 GIF, plus the raw skin PNG and a
-  rendered head PNG.
+- 💾 **One-click downloads** — a 512×512 GIF (orbit on) or PNG (orbit off), plus the raw
+  skin PNG and a rendered head PNG.
 - ✨ **Minecraft flourishes** — random splash text, an "Advancement Made!" toast, the
   searched player's head as the tab favicon (remembered across visits), and the
   Dinnerbone/Grumm upside-down easter egg.
@@ -70,7 +73,8 @@ username / gamertag
 playerId + model + official textures.minecraft.net URLs
    │  fetch as Blob → object URL  (keeps the WebGL canvas untainted)
    ▼
-skinview3d (three.js) live preview  ──step frames──▶  gifenc  ──▶  looping GIF
+skinview3d (three.js) live preview  ──step frames──▶  gifenc  ──▶  looping GIF (orbit on)
+                                   ──single frame──▶  canvas.toBlob  ──▶  PNG (orbit off)
 ```
 
 A few deliberate choices worth calling out:
@@ -91,19 +95,20 @@ A few deliberate choices worth calling out:
   URLs. This guarantees the WebGL canvas is never "tainted", which is what lets us read
   pixels back (`getImageData`) to encode the GIF.
 
-- **One render path — the GIF *is* the preview.** There's a single skinview3d viewer
-  (in [`src/hooks/usePreview.ts`](src/hooks/usePreview.ts)); the GIF is captured straight
-  from it by borrowing and restoring its size/background/render-loop. `applyLoopFrame()`
-  in [`src/lib/exportGif.ts`](src/lib/exportGif.ts) is the single source of truth for a
-  frame at phase `t` ∈ [0, 1): the live preview drives it via a `FunctionAnimation`; the
-  exporter steps it by hand at `t = i/frames`. No second offscreen renderer to drift out
-  of sync — what you drag is what you download.
+- **One render path — the export *is* the preview.** There's a single skinview3d viewer
+  (in [`src/hooks/usePreview.ts`](src/hooks/usePreview.ts)); both the GIF and PNG are
+  captured straight from it by borrowing and restoring its size/background/render-loop.
+  `applyLoopFrame()` in [`src/lib/exportGif.ts`](src/lib/exportGif.ts) is the single
+  source of truth for a frame at phase `t` ∈ [0, 1): the live preview drives it via a
+  `FunctionAnimation`; the GIF exporter steps it by hand at `t = i/frames`; the PNG
+  exporter takes a single frame at `t = 0`. No second offscreen renderer to drift out of
+  sync — what you drag is what you download.
 
-- **Seamless loops by construction.** Frames are stepped deterministically rather than
-  captured in real time. The run animation drives limbs with `cos(progress · 15)`, so one
-  full cycle spans a `progress` interval of `2π/15` — we loop over exactly that. Crouch
-  and fly are *held* poses settled once and frozen, so with orbit off they export as a
-  single frame; orbit mode rotates the model `0 → 2π` across the loop.
+- **All poses are held, orbit creates the loop.** Every pose (Stand, Walk, Run, Crouch,
+  Fly) is a snapshot of its skinview3d animation settled at a characteristic progress
+  value — no limbs cycling during export. Orbit is the sole source of motion: it rotates
+  `playerWrapper` from `0 → 2π` across the frame loop, producing a seamless spin. With
+  orbit off there's nothing to loop, so the exporter takes one frame and writes a PNG.
 
 - **The panorama is six planes, not a skybox.** Minecraft's title background is rendered
   as six inward-facing planes (one per cube face) rather than a `BoxGeometry`. The pivot
@@ -187,9 +192,9 @@ favicon.
 src/
   App.tsx                top-level UI, state, and export orchestration
   hooks/
-    usePreview.ts        the live skinview3d viewer + captureGif (the single render path)
+    usePreview.ts        the live skinview3d viewer + captureRender (the single render path)
   components/            Ore-UI controls: SearchBar, Slider, Switch, Multibutton,
-                         Panorama, Settings, GifModal, Toast, CloseIcon
+                         Panorama, Settings, RenderModal, Toast, CloseIcon
   lib/
     providers.ts         username/gamertag → official Mojang texture URLs (data-source seam)
     profile.ts           resolve + fetch-as-object-URL → a renderable profile
@@ -205,7 +210,7 @@ src/
 scripts/
   refresh-assets.mjs     download panorama faces + favicon from Mojang's CDN
   smoke-local.mjs        turnkey: build → serve → smoke → tear down
-  smoke.mjs              Playwright browser smoke (real lookup → WebGL → GIF validation)
+  smoke.mjs              Playwright browser smoke (real lookup → WebGL → GIF/PNG validation)
   analyze-gif.mjs        GIF-byte validator used by the smoke test
 ```
 
@@ -220,7 +225,7 @@ scripts/
 - **Browser smoke** ([`scripts/smoke.mjs`](scripts/smoke.mjs)) drives the real app in
   headless Chromium and validates the emitted bytes are genuine looping GIFs (with the
   transparency flag set when requested). It exercises the one path jsdom can't: live skin
-  lookups + WebGL render + gifenc encode, across modes/backgrounds and with/without a
+  lookups + WebGL render + gifenc encode, across poses/backgrounds and with/without a
   cape. `npm run smoke` is turnkey — it builds, serves the build, runs the test, and tears
   the server down:
 
