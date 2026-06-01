@@ -245,6 +245,10 @@ a.mc-btn.mc-btn-green:active:not(:disabled) {
   height: 1.6rem;
   filter: drop-shadow(0.08em 0.08em 0 rgba(0, 0, 0, 0.5));
 }
+.mc-btn-close svg {
+  width: 0.67rem;
+  height: 0.67rem;
+}
 
 /* ── Bedrock toggle switch ────────────────────────────────────────────────── */
 .mc-switch {
@@ -271,71 +275,48 @@ a.mc-btn.mc-btn-green:active:not(:disabled) {
   flex-shrink: 0;
   width: 56px;
   height: 28px;
-  background: #48494a;
-  border: 2px solid #131313;
-  border-radius: 0;
-  box-shadow: inset 2px 2px #3a3b3c, inset -2px -2px #5a5b5c;
 }
-/* Left half: shows green + pipe when on */
-.mc-switch-on {
+.mc-switch-track-bg {
   position: absolute;
-  left: 0;
   top: 0;
-  width: 50%;
-  height: 100%;
-  display: grid;
-  place-items: center;
-  background: #48494a;
-  color: transparent;
-  transition: background 0.2s, color 0.2s;
+  left: -2px;
   z-index: 0;
+  pointer-events: none;
 }
-.mc-switch-on svg {
-  width: 0.75rem;
-  height: 0.75rem;
+.mc-switch-track-bg svg {
+  width: 60px;
+  height: 28px;
+  display: block;
 }
-/* Right half: hollow square off-indicator */
-.mc-switch-off {
-  position: absolute;
-  left: 75%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  width: 10px;
-  height: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #8b8b8b;
-  z-index: 0;
-}
-.mc-switch-off svg {
-  width: 10px;
-  height: 10px;
-}
-/* Sliding thumb: raised square that protrudes above/below the track */
+/* Thumb: 16×16 units at 2px/unit = 32×32px. Protrudes 2 units (4px) above track top,
+   flush with track bottom. Left flush = outer left border (−2px); right flush = +28px. */
 .mc-switch-thumb {
   position: absolute;
-  top: -3px;
-  left: 0;
-  width: 50%;
-  height: calc(100% + 6px);
-  background: #c6c6c6;
-  border: 2px solid #131313;
-  border-radius: 0;
-  box-shadow:
-    inset 2px 2px #e8e8e8,
-    inset 0 -4px #6a6a6a,
-    inset 0 -6px #404040;
+  top: -4px;
+  left: -2px;
+  width: 32px;
+  height: 32px;
   transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
   z-index: 1;
-}
-.mc-switch-input:checked + .mc-switch-track .mc-switch-on {
-  background: var(--color-grass);
-  color: #fff;
+  display: flex;
 }
 .mc-switch-input:checked + .mc-switch-track .mc-switch-thumb {
-  transform: translateX(100%);
+  transform: translateX(28px);
 }
+
+/* Thumb size + hover fill via CSS variable */
+.mc-range-thumb-overlay svg {
+  width: 32px;
+  height: 32px;
+  display: block;
+}
+.mc-switch-thumb svg {
+  width: 32px;
+  height: 32px;
+  display: block;
+}
+.mc-range-wrap:hover .mc-range-thumb-overlay,
+.mc-switch:hover .mc-switch-thumb { --thumb-fill: #b1b2b5; }
 
 /* ── Animation mode slider (connected segmented control) ─────────────────── */
 .mc-anim-slider {
@@ -386,9 +367,10 @@ a.mc-btn.mc-btn-green:active:not(:disabled) {
   color: var(--color-muted);
 }
 .mc-range-track {
+  position: relative;
   display: flex;
   align-items: center;
-  padding: 6px 0;
+  padding: 20px 0;
 }
 .mc-range {
   appearance: none;
@@ -399,7 +381,7 @@ a.mc-btn.mc-btn-green:active:not(:disabled) {
   border-radius: 0;
   outline: none;
   cursor: pointer;
-  /* --pct set via inline style to split green/grey at thumb position */
+  /* --pct inherited from .mc-range-track inline style */
   background: linear-gradient(
     to right,
     var(--color-grass) var(--pct, 0%),
@@ -408,28 +390,31 @@ a.mc-btn.mc-btn-green:active:not(:disabled) {
 }
 .mc-range::-webkit-slider-thumb {
   -webkit-appearance: none;
-  width: 16px;
-  height: 16px;
-  background: #c6c6c6;
-  border: 2px solid #131313;
-  border-radius: 0;
-  box-shadow: inset 2px 2px #e4e4e4, inset -2px -2px #8b8b8b;
+  width: 32px;
+  height: 32px;
+  background: transparent;
+  border: none;
+  box-shadow: none;
   cursor: pointer;
-}
-.mc-range::-webkit-slider-thumb:hover {
-  background: #a8a8a8;
 }
 .mc-range::-moz-range-thumb {
-  width: 16px;
-  height: 16px;
-  background: #c6c6c6;
-  border: 2px solid #131313;
-  border-radius: 0;
-  box-shadow: inset 2px 2px #e4e4e4, inset -2px -2px #8b8b8b;
+  width: 32px;
+  height: 32px;
+  background: transparent;
+  border: none;
+  box-shadow: none;
   cursor: pointer;
 }
-.mc-range::-moz-range-thumb:hover {
-  background: #a8a8a8;
+.mc-range-thumb-overlay {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 32px;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  left: var(--pct, 0%);
+  transform: translateX(calc(-1 * var(--pct, 0%)));
 }
 
 /* ── Recessed inventory slot ──────────────────────────────────────────────── */

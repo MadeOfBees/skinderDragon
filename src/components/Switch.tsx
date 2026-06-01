@@ -1,5 +1,5 @@
-import { SwitchOnIcon } from "../icons/SwitchOnIcon";
-import { SwitchOffIcon } from "../icons/SwitchOffIcon";
+import { SwitchTrackIcon } from "../icons/SwitchTrackIcon";
+import { ThumbIcon } from "../icons/thumb/ThumbIcon";
 
 interface SwitchProps {
   label: string;
@@ -18,9 +18,10 @@ export function Switch({ label, checked, onChange }: SwitchProps) {
         onChange={onChange}
       />
       <span className="mc-switch-track">
-        <span className="mc-switch-on"><SwitchOnIcon /></span>
-        <span className="mc-switch-off"><SwitchOffIcon /></span>
-        <span className="mc-switch-thumb" />
+        <span className="mc-switch-track-bg"><SwitchTrackIcon checked={checked} /></span>
+        <span className="mc-switch-thumb">
+          <ThumbIcon />
+        </span>
       </span>
     </label>
   );

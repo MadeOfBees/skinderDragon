@@ -1,3 +1,5 @@
+import { ThumbIcon } from "../icons/thumb/ThumbIcon";
+
 interface SliderProps {
   label: string;
   value: number;
@@ -29,7 +31,7 @@ export function Slider({
           <span className="mc-range-value">{valueLabel}</span>
         )}
       </div>
-      <div className="mc-range-track">
+      <div className="mc-range-track" style={{ "--pct": pct } as React.CSSProperties}>
         <input
           type="range"
           className="mc-range"
@@ -38,9 +40,11 @@ export function Slider({
           step={step}
           value={value}
           onChange={(e) => onChange(Number(e.target.value))}
-          style={{ "--pct": pct } as React.CSSProperties}
           aria-label={ariaLabel ?? label}
         />
+        <div className="mc-range-thumb-overlay" aria-hidden="true">
+          <ThumbIcon />
+        </div>
       </div>
     </div>
   );
