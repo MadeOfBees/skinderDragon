@@ -21,7 +21,7 @@ export function SearchBar({
   className = "",
 }: SearchBarProps) {
   return (
-    <div className={`mc-search-panel p-3.5 ${className}`}>
+    <div className={`mc-panel p-3.5 ${className}`}>
       <form className="mc-search-bar flex items-center" onSubmit={onSubmit}>
         <input
           type="text"

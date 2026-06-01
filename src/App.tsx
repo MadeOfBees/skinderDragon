@@ -16,6 +16,7 @@ import { loadLastSearch, rememberLastSearch, setFavicon } from "./lib/favicon";
 import { loadPanoramaSource, savePanoramaSource, loadEdition, saveEdition } from "./lib/settings";
 import type { Edition } from "./lib/providers";
 import { randomSplash } from "./data/splashes";
+import { Button } from "./components/Button";
 import { SettingsIcon } from "./icons/SettingsIcon";
 import { DownloadIcon } from "./icons/DownloadIcon";
 
@@ -219,16 +220,15 @@ export function App() {
       <Panorama paused={generating} source={panoramaSource} />
       <Toast message={toast} headUrl={headUrl} onDismiss={dismissToast} />
 
-      <button
-        type="button"
+      <Button
         data-testid="open-settings"
         aria-label="Settings"
         title="Settings"
         onClick={() => setSettingsOpen(true)}
-        className="mc-btn mc-btn-stone mc-btn-icon mc-btn-gear fixed top-3 right-3 z-50"
+        className="mc-btn-gear fixed top-3 right-3 z-50"
       >
         <SettingsIcon />
-      </button>
+      </Button>
       <Settings
         open={settingsOpen}
         onClose={closeSettings}

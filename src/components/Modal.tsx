@@ -1,4 +1,5 @@
 import { useEffect, useRef, type ReactNode } from "react";
+import { Button } from "./Button";
 import { CloseIcon } from "../icons/CloseIcon";
 
 interface ModalProps {
@@ -110,15 +111,14 @@ export function Modal({
       >
         <header className="mc-modal-header flex w-full items-center justify-between gap-3">
           <h2 className="mc-title text-[1.1rem]">{title}</h2>
-          <button
-            type="button"
+          <Button
+            aria-label="Close"
             onClick={onClose}
             disabled={disabled}
-            aria-label="Close"
-            className="mc-btn mc-btn-stone mc-btn-icon mc-btn-close"
+            className="mc-btn-close"
           >
             <CloseIcon />
-          </button>
+          </Button>
         </header>
         {children}
       </div>

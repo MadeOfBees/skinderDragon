@@ -22,6 +22,14 @@
   --font-mc: "Monocraft", ui-monospace, "Courier New", monospace;
 }
 
+:root {
+  --border-dark: 2px solid #131313;
+  --shadow-btn-bevel: inset 2px 2px #e4e4e4, inset -2px -2px #8b8b8b;
+  --shadow-panel-bevel: inset 2px 2px #48494a, inset -2px -2px #1e1e1f;
+  --shadow-green: inset 0 -4px #1d4d13, inset 3px 3px rgba(255, 255, 255, 0.2), inset -3px -7px rgba(255, 255, 255, 0.1);
+  --shadow-green-hover: inset 0 -4px #1d4d13, inset 3px 3px rgba(255, 255, 255, 0.4), inset -3px -7px rgba(255, 255, 255, 0.3);
+}
+
 /* OreUI base resets */
 * {
   -webkit-tap-highlight-color: transparent;
@@ -79,35 +87,11 @@ a {
 }
 /* <a> elements with mc-btn need the link underline cancelled */
 a.mc-btn {
-  box-shadow: inset 2px 2px #e4e4e4,
-    inset -2px -2px #8b8b8b;
-}
-/* a.mc-btn.mc-btn-green (0-2-1) beats a.mc-btn (0-1-1) */
-a.mc-btn.mc-btn-green {
-  box-shadow: inset 0 -4px #1d4d13,
-    inset 3px 3px rgba(255, 255, 255, 0.2),
-    inset -3px -7px rgba(255, 255, 255, 0.1);
-}
-a.mc-btn.mc-btn-green:hover:not(:disabled) {
-  filter: none;
-  background-color: #2a641c;
-  border-color: #1e1e1f;
-  box-shadow: inset 0 -4px #1d4d13,
-    inset 3px 3px rgba(255, 255, 255, 0.4),
-    inset -3px -7px rgba(255, 255, 255, 0.3);
-}
-a.mc-btn.mc-btn-green:active:not(:disabled) {
-  filter: none;
-  background-color: #1d4d13;
-  border-color: #1e1e1f;
-  box-shadow: inset 3px 3px rgba(255, 255, 255, 0.4),
-    inset -3px -3px rgba(255, 255, 255, 0.3);
-  transform: translateY(2px);
+  box-shadow: var(--shadow-btn-bevel);
 }
 
 /* ── Logo-style title + splash ────────────────────────────────────────────── */
 .mc-title {
-  font-family: var(--font-mc);
   margin: 0;
   line-height: 1.05;
   color: #fff;
@@ -115,7 +99,6 @@ a.mc-btn.mc-btn-green:active:not(:disabled) {
   text-shadow: 3px 3px 0 #2a2a2a, 5px 5px 0 rgba(0, 0, 0, 0.5);
 }
 .mc-splash {
-  font-family: var(--font-mc);
   color: var(--color-splash);
   text-shadow: 0.1em 0.1em 0 #3f3f00;
   transform: rotate(-15deg);
@@ -134,9 +117,9 @@ a.mc-btn.mc-btn-green:active:not(:disabled) {
 /* ── Ore UI dark panel ────────────────────────────────────────────────────── */
 .mc-panel {
   background: color-mix(in srgb, var(--color-panel) 92%, transparent);
-  border: 2px solid #131313;
+  border: var(--border-dark);
   /* OreUI 2-px pixel bevel: lighter top-left inner, darker bottom-right inner */
-  box-shadow: inset 2px 2px #48494a, inset -2px -2px #1e1e1f;
+  box-shadow: var(--shadow-panel-bevel);
 }
 
 /* Ore UI section header inside a panel: small-caps label + OreUI-style divider. */
@@ -156,23 +139,20 @@ a.mc-btn.mc-btn-green:active:not(:disabled) {
   font-size: 0.95rem;
   color: #fff;
   background: var(--color-stone);
-  border: 2px solid #131313;
+  border: var(--border-dark);
   border-radius: 0;
   padding: 0.6rem 0.85rem;
   cursor: pointer;
   user-select: none;
   text-shadow: 0.09em 0.09em 0 rgba(0, 0, 0, 0.5);
   /* vanilla MC button bevel: lighter top-left, darker bottom-right */
-  box-shadow: inset 2px 2px #e4e4e4,
-    inset -2px -2px #8b8b8b;
+  box-shadow: var(--shadow-btn-bevel);
 }
 /* Bedrock: gray buttons turn green on hover */
 .mc-btn:hover:not(:disabled) {
   filter: none;
   background-color: var(--color-grass);
-  box-shadow: inset 0 -4px #1d4d13,
-    inset 3px 3px rgba(255, 255, 255, 0.2),
-    inset -3px -7px rgba(255, 255, 255, 0.1);
+  box-shadow: var(--shadow-green);
 }
 .mc-btn:focus-visible {
   outline: 2px solid #fff;
@@ -190,22 +170,22 @@ a.mc-btn.mc-btn-green:active:not(:disabled) {
   color: #8c8d90;
   cursor: default;
 }
-/* ── Green button: doubled selector (0-2-0) beats .mc-btn rules (0-1-0 / 0-3-0) ── */
+
+/* ── Green button: (0-2-1)/(0-2-0) beat .mc-btn and a.mc-btn rules ── */
+a.mc-btn.mc-btn-green,
 .mc-btn.mc-btn-green {
   background-color: #3c8527;
   border-color: #1e1e1f;
-  box-shadow: inset 0 -4px #1d4d13,
-    inset 3px 3px rgba(255, 255, 255, 0.2),
-    inset -3px -7px rgba(255, 255, 255, 0.1);
+  box-shadow: var(--shadow-green);
 }
+a.mc-btn.mc-btn-green:hover:not(:disabled),
 .mc-btn.mc-btn-green:hover:not(:disabled) {
   filter: none;
   background-color: #2a641c;
   border-color: #1e1e1f;
-  box-shadow: inset 0 -4px #1d4d13,
-    inset 3px 3px rgba(255, 255, 255, 0.4),
-    inset -3px -7px rgba(255, 255, 255, 0.3);
+  box-shadow: var(--shadow-green-hover);
 }
+a.mc-btn.mc-btn-green:active:not(:disabled),
 .mc-btn.mc-btn-green:active:not(:disabled) {
   filter: none;
   background-color: #1d4d13;
@@ -214,9 +194,7 @@ a.mc-btn.mc-btn-green:active:not(:disabled) {
     inset -3px -3px rgba(255, 255, 255, 0.3);
   transform: translateY(2px);
 }
-.mc-btn-stone {
-  background: var(--color-stone);
-}
+
 .mc-btn-hero {
   font-size: 1.15rem;
   padding: 0.85rem 1rem;
@@ -304,12 +282,8 @@ a.mc-btn.mc-btn-green:active:not(:disabled) {
   transform: translateX(28px);
 }
 
-/* Thumb size + hover fill via CSS variable */
-.mc-range-thumb-overlay svg {
-  width: 32px;
-  height: 32px;
-  display: block;
-}
+/* Thumb size + hover fill via CSS variable — shared between slider and switch */
+.mc-range-thumb-overlay svg,
 .mc-switch-thumb svg {
   width: 32px;
   height: 32px;
@@ -344,7 +318,6 @@ a.mc-btn.mc-btn-green:active:not(:disabled) {
     inset 2px 2px #1d4d13,
     inset -2px -2px rgba(255, 255, 255, 0.12),
     inset 0 -3px 0 rgba(255, 255, 255, 0.55);
-  transform: none;
 }
 
 /* ── Minecraft range slider ───────────────────────────────────────────────── */
@@ -359,11 +332,11 @@ a.mc-btn.mc-btn-green:active:not(:disabled) {
   align-items: baseline;
   margin-bottom: 0.25rem;
 }
-.mc-range-label {
+.mc-range-label,
+.mc-range-value {
   font-size: 0.875rem;
 }
 .mc-range-value {
-  font-size: 0.875rem;
   color: var(--color-muted);
 }
 .mc-range-track {
@@ -420,8 +393,7 @@ a.mc-btn.mc-btn-green:active:not(:disabled) {
 /* ── Recessed inventory slot ──────────────────────────────────────────────── */
 .mc-slot {
   background: #131314;
-  border: 2px solid #131313;
-  border-radius: 0;
+  border: var(--border-dark);
   /* Inverted bevel: dark top-left, lighter bottom-right (recessed look) */
   box-shadow: inset 2px 2px #0a0a0b,
     inset -2px -2px #48494a,
@@ -447,7 +419,7 @@ a.mc-btn.mc-btn-green:active:not(:disabled) {
   font-family: var(--font-mc);
   background: #48494a;
   color: #fff;
-  border: 2px solid #131313;
+  border: var(--border-dark);
   border-radius: 0;
   padding: 0.6rem 0.7rem;
   outline: none;
@@ -469,11 +441,6 @@ a.mc-btn.mc-btn-green:active:not(:disabled) {
 }
 
 /* ── Search bar — greyscale, matches UI examples/SearchBar*.png ───────────── */
-.mc-search-panel {
-  background: color-mix(in srgb, var(--color-panel) 92%, transparent);
-  border: 2px solid #131313;
-  box-shadow: inset 2px 2px #48494a, inset -2px -2px #1e1e1f;
-}
 /* Recessed dark field: black frame, dark-top / light-bottom inner bevel. */
 .mc-search-bar .mc-input {
   background: #5e5e5e;
@@ -505,7 +472,7 @@ a.mc-btn.mc-btn-green:active:not(:disabled) {
   height: 2.7rem;
   background: #c6c6c6;
   color: #4c4c4c;
-  border: 2px solid #131313;
+  border: var(--border-dark);
   cursor: pointer;
   box-shadow: inset 2px 2px #f7f7f7, inset -2px -2px #656465;
   /* Snappy darken on hover/press — short enough to read as instant feedback. */
@@ -546,8 +513,7 @@ a.mc-btn.mc-btn-green:active:not(:disabled) {
 .mc-xp {
   height: 14px;
   background: #131313;
-  border: 2px solid #131313;
-  border-radius: 0;
+  border: var(--border-dark);
   overflow: hidden;
   box-shadow: inset 1px 1px #0a0a0b, inset -1px -1px #313233;
 }
@@ -561,13 +527,12 @@ a.mc-btn.mc-btn-green:active:not(:disabled) {
 
 /* ── Tag chip (cape, etc.) ────────────────────────────────────────────────── */
 .mc-tag {
-  font-family: var(--font-mc);
   font-size: 0.6rem;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: #fff;
   background: var(--color-grass);
-  border: 2px solid #131313;
+  border: var(--border-dark);
   padding: 1px 6px;
   box-shadow: inset 0 -2px #1d4d13, inset 1px 1px rgba(255, 255, 255, 0.2);
 }
@@ -606,9 +571,8 @@ a.mc-btn.mc-btn-green:active:not(:disabled) {
   align-items: center;
   gap: 10px;
   background: linear-gradient(#313233, #1e1e1f);
-  border: 2px solid #131313;
-  box-shadow: inset 2px 2px #48494a,
-    inset -2px -2px #1e1e1f,
+  border: var(--border-dark);
+  box-shadow: var(--shadow-panel-bevel),
     inset 1px 1px #1e1e1f,
     inset -1px -1px #131313;
   padding: 8px 12px;
