@@ -8,15 +8,17 @@
   },
   "scripts": {
     "dev": "npm run assets:ensure && vite",
-    "build": "tsc && vite build",
+    "build": "npm run assets:build && tsc && vite build",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "smoke": "node scripts/smoke-local.mjs",
-    "verify": "tsc --noEmit && vitest run",
+    "verify": "tsc --noEmit && npm run typecheck:test && vitest run",
+    "typecheck:test": "tsc --noEmit -p tsconfig.test.json",
     "assets:refresh": "node scripts/refresh-assets.mjs",
-    "assets:ensure": "node scripts/refresh-assets.mjs --ensure"
+    "assets:ensure": "node scripts/refresh-assets.mjs --ensure",
+    "assets:build": "node scripts/refresh-assets.mjs --ensure --strict"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.0",

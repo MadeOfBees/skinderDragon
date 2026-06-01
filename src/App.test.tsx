@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import userEvent from "@testing-library/user-event";
 
@@ -23,8 +23,10 @@ vi.mock("skinview3d", () => {
     constructor(..._args: unknown[]) {}
   }
   class FunctionAnimation extends Anim {
-    constructor(public fn: unknown) {
+    fn: unknown;
+    constructor(fn: unknown) {
       super();
+      this.fn = fn;
     }
   }
   return {
@@ -68,6 +70,12 @@ const profile = {
 async function loadUser(name: string) {
   await userEvent.type(screen.getByPlaceholderText(/username/i), name);
   await userEvent.click(screen.getByRole("button", { name: /search/i }));
+}
+
+async function waitForPreviewReady() {
+  const button = await screen.findByRole("button", { name: /generate gif/i });
+  await waitFor(() => expect(button).toBeEnabled());
+  return button;
 }
 
 beforeEach(() => {
@@ -124,7 +132,7 @@ describe("<App>", () => {
     await loadUser("EthosLab");
     await screen.findByText("EthosLab");
 
-    await userEvent.click(screen.getByRole("button", { name: /generate gif/i }));
+    await userEvent.click(await waitForPreviewReady());
 
     const link = await screen.findByRole("link", { name: /download gif/i });
     expect(link).toHaveAttribute("download", "EthosLab-run.gif");
@@ -138,6 +146,30 @@ describe("<App>", () => {
     );
   });
 
+  it("lets an in-progress GIF render be cancelled", async () => {
+    vi.mocked(fetchProfile).mockResolvedValue(profile);
+    let signal: AbortSignal | undefined;
+    vi.mocked(captureViewerGif).mockImplementation(
+      (_viewer, _modeAnim, opts) =>
+        new Promise((_, reject) => {
+          signal = opts.signal;
+          opts.signal?.addEventListener("abort", () => {
+            reject(new DOMException("cancelled", "AbortError"));
+          });
+        })
+    );
+    render(<App />);
+    await loadUser("EthosLab");
+    await screen.findByText("EthosLab");
+
+    await userEvent.click(await waitForPreviewReady());
+    await userEvent.click(await screen.findByRole("button", { name: /cancel/i }));
+
+    await waitFor(() => expect(screen.queryByTestId("gif-modal")).not.toBeInTheDocument());
+    expect(signal?.aborted).toBe(true);
+    expect(screen.queryByText(/failed to generate/i)).not.toBeInTheDocument();
+  });
+
   it("layers the orbit toggle onto a mode and honors transparency", async () => {
     vi.mocked(fetchProfile).mockResolvedValue(profile);
     vi.mocked(captureViewerGif).mockResolvedValue(new Blob(["gif"], { type: "image/gif" }));
@@ -148,7 +180,7 @@ describe("<App>", () => {
     // Orbit is a modifier: the mode stays "run" but orbit flips on.
     await userEvent.click(screen.getByRole("checkbox", { name: /orbit/i }));
     await userEvent.click(screen.getByRole("button", { name: /transparent/i }));
-    await userEvent.click(screen.getByRole("button", { name: /generate gif/i }));
+    await userEvent.click(await waitForPreviewReady());
 
     expect(captureViewerGif).toHaveBeenCalledWith(
       expect.anything(),
@@ -171,7 +203,7 @@ describe("<App>", () => {
 
     // Slider index 0 = sneak (Crouch), 1 = run, 2 = fly
     fireEvent.change(screen.getByRole("slider", { name: /animation mode/i }), { target: { value: "0" } });
-    await userEvent.click(screen.getByRole("button", { name: /generate gif/i }));
+    await userEvent.click(await waitForPreviewReady());
 
     const link = await screen.findByRole("link", { name: /download gif/i });
     expect(link).toHaveAttribute("download", "EthosLab-sneak.gif");
@@ -191,7 +223,7 @@ describe("<App>", () => {
     await userEvent.click(nametag);
     expect(nametag).toBeChecked();
 
-    await userEvent.click(screen.getByRole("button", { name: /generate gif/i }));
+    await userEvent.click(await waitForPreviewReady());
     expect(await screen.findByRole("link", { name: /download gif/i })).toBeInTheDocument();
     expect(captureViewerGif).toHaveBeenCalled();
   });
@@ -208,6 +240,9 @@ describe("<App>", () => {
     await userEvent.click(screen.getByTestId("panorama-snapshot"));
     expect(screen.getByTestId("panorama-snapshot")).toHaveAttribute("aria-pressed", "true");
     expect(localStorage.getItem("skinderdragon:panoramaSource")).toBe("snapshot");
+
+    await userEvent.click(screen.getByTestId("edition-bedrock"));
+    expect(screen.getByText(/bedrock skins are best-effort/i)).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: /done/i }));
     expect(screen.queryByTestId("settings")).not.toBeInTheDocument();

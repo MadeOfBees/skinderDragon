@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type ReactNode, type SyntheticEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode, type SyntheticEvent } from "react";
 import { fetchProfile, ProfileError, type MinecraftProfile } from "./lib/profile";
 import { type AnimationMode, DEFAULT_GIF_SIZE } from "./lib/exportGif";
 import { Panorama, type PanoramaSource } from "./components/Panorama";
@@ -72,11 +72,12 @@ export function App() {
   const [gifUrl, setGifUrl] = useState<string | null>(null);
   const [gifModalOpen, setGifModalOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const generationAbortRef = useRef<AbortController | null>(null);
 
   const [splash] = useState(randomSplash);
 
   const upsideDown = !!profile && FLIP_NAMES.test(profile.username);
-  const { canvasRef, captureGif } = usePreview(
+  const { canvasRef, captureGif, ready: previewReady, error: previewError } = usePreview(
     profile,
     mode,
     orbit,
@@ -137,6 +138,9 @@ export function App() {
   const closeSettings = useCallback(() => setSettingsOpen(false), []);
   const closeGifModal = useCallback(() => setGifModalOpen(false), []);
   const dismissToast = useCallback(() => setToast(null), []);
+  const cancelGeneration = useCallback(() => {
+    generationAbortRef.current?.abort();
+  }, []);
 
   const changePanoramaSource = useCallback((source: PanoramaSource) => {
     setPanoramaSource(source);
@@ -172,28 +176,41 @@ export function App() {
   }
 
   async function onGenerate() {
-    if (!profile || generating) return;
+    if (!profile || generating || !previewReady || previewError) return;
     setGenerating(true);
     setProgress(0);
     setGifUrl(null);
     setGifModalOpen(true);
+    const abort = new AbortController();
+    generationAbortRef.current = abort;
     try {
       // The GIF is captured from the live preview viewer — WYSIWYG.
       const blob = await captureGif({
         background: bgKind === "color" ? { kind: "color", color: bgColor } : { kind: "transparent" },
         onProgress: setProgress,
+        signal: abort.signal,
         ...GIF_OVERRIDES,
       });
       setGifUrl(URL.createObjectURL(blob));
       setToast("Picture Perfect");
     } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") {
+        setGifModalOpen(false);
+        return;
+      }
       console.error(err);
       setError("Failed to generate the GIF. See the console for details.");
       setGifModalOpen(false);
     } finally {
+      generationAbortRef.current = null;
       setGenerating(false);
     }
   }
+
+  let generateLabel = "Loading preview…";
+  if (generating) generateLabel = `Generating… ${Math.round(progress * 100)}%`;
+  else if (previewError) generateLabel = "Preview unavailable";
+  else if (previewReady) generateLabel = "Generate GIF";
 
   return (
     <>
@@ -232,6 +249,7 @@ export function App() {
           size={GIF_OVERRIDES.size ?? DEFAULT_GIF_SIZE}
           downloadName={`${profile.username}-${mode}${orbit ? "-orbit" : ""}.gif`}
           onClose={closeGifModal}
+          onCancel={cancelGeneration}
         />
       )}
 
@@ -261,6 +279,11 @@ export function App() {
               <PreviewSlot>
                 <canvas ref={canvasRef} className="block cursor-grab active:cursor-grabbing" />
               </PreviewSlot>
+              {previewError && (
+                <p data-testid="preview-error" className="max-w-80 text-center text-sm text-red-300">
+                  {previewError}
+                </p>
+              )}
               <span className="inline-flex items-center gap-2">
                 {headUrl && (
                   <img src={headUrl} alt="" className="pixelated h-6 w-6 border-2 border-black" />
@@ -349,10 +372,10 @@ export function App() {
               <button
                 type="button"
                 onClick={onGenerate}
-                disabled={generating}
+                disabled={generating || !previewReady || !!previewError}
                 className="mc-btn mc-btn-green mc-btn-hero w-full"
               >
-                {generating ? `Generating… ${Math.round(progress * 100)}%` : "Generate GIF"}
+                {generateLabel}
               </button>
             </div>
           </main>

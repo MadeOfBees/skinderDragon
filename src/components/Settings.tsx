@@ -45,7 +45,14 @@ export function Settings({
   return (
     <Modal open={open} title="Settings" ariaLabel="Settings" onClose={onClose} testId="settings">
       <div className="mc-modal-body">
-        <SettingRow label="Edition" hint="Which Minecraft edition to search.">
+        <SettingRow
+          label="Edition"
+          hint={
+            edition === "bedrock"
+              ? "Bedrock skins are best-effort; GeyserMC only has skins for players in its cache."
+              : "Which Minecraft edition to search."
+          }
+        >
           <Multibutton
             options={[
               { label: "Java", value: "java" as Edition, testId: "edition-java" },

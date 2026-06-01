@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { SkinViewer } from "skinview3d";
 import { loadSkinview3d } from "../lib/skinview";
 import {
@@ -27,7 +27,7 @@ const NAMETAG_Y = 20;
 /** The bits of a capture the preview can't infer from its own live state. */
 export type CaptureRequest = Pick<
   CaptureOptions,
-  "background" | "size" | "frames" | "fps" | "onProgress"
+  "background" | "size" | "frames" | "fps" | "onProgress" | "signal"
 >;
 
 /**
@@ -104,6 +104,8 @@ export function usePreview(
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const viewerRef = useRef<SkinViewer | null>(null);
   const modeAnimRef = useRef<ModeAnimation | null>(null);
+  const [ready, setReady] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   // Resolves when the nametag's custom font is painted; reset to Promise.resolve() when off.
   const fontReadyRef = useRef<Promise<void>>(Promise.resolve());
   // Tracks the NameTagObject added directly to viewer.scene (bypassing viewer.nameTag
@@ -112,36 +114,55 @@ export function usePreview(
 
   useEffect(() => {
     const canvas = canvasRef.current;
+    setReady(false);
+    setError(null);
+    modeAnimRef.current = null;
+    fontReadyRef.current = Promise.resolve();
     if (!profile || !canvas) return;
 
     let cancelled = false;
+    let activeViewer: SkinViewer | null = null;
     (async () => {
-      const sv = await loadSkinview3d();
-      if (cancelled) return;
-      const viewer = new sv.SkinViewer({
-        canvas,
-        width: 340,
-        height: 340,
-        zoom: PREVIEW_ZOOM,
-        fov: 45,
-        // The GIF is captured from this canvas, so its buffer must survive the
-        // read-back (see captureViewerGif).
-        preserveDrawingBuffer: true,
-      });
-      viewer.controls.enablePan = false;
-      viewerRef.current = viewer;
+      try {
+        const sv = await loadSkinview3d();
+        if (cancelled) return;
+        const viewer = new sv.SkinViewer({
+          canvas,
+          width: 340,
+          height: 340,
+          zoom: PREVIEW_ZOOM,
+          fov: 45,
+          // The GIF is captured from this canvas, so its buffer must survive the
+          // read-back (see captureViewerGif).
+          preserveDrawingBuffer: true,
+        });
+        activeViewer = viewer;
+        viewer.controls.enablePan = false;
+        viewerRef.current = viewer;
 
-      await viewer.loadSkin(profile.skinUrl, {
-        model: profile.slim ? "slim" : "default",
-      });
-      if (profile.capeUrl) await viewer.loadCape(profile.capeUrl);
-      if (!cancelled) modeAnimRef.current = await applyMode(viewer, mode, orbit, upsideDown);
+        await viewer.loadSkin(profile.skinUrl, {
+          model: profile.slim ? "slim" : "default",
+        });
+        if (cancelled) return;
+
+        if (profile.capeUrl) await viewer.loadCape(profile.capeUrl);
+        if (cancelled) return;
+
+        modeAnimRef.current = await applyMode(viewer, mode, orbit, upsideDown);
+        if (!cancelled) setReady(true);
+      } catch {
+        activeViewer?.dispose();
+        if (viewerRef.current === activeViewer) viewerRef.current = null;
+        if (!cancelled) {
+          setError("3D preview failed to load. Check that WebGL is enabled and try again.");
+        }
+      }
     })();
 
     return () => {
       cancelled = true;
-      viewerRef.current?.dispose();
-      viewerRef.current = null;
+      activeViewer?.dispose();
+      if (viewerRef.current === activeViewer) viewerRef.current = null;
       nameTagObjRef.current = null; // scene is gone; nametag effect will re-add on rebuild
     };
     // Rebuild on profile change only; mode/orbit/flip are handled below.
@@ -152,9 +173,21 @@ export function usePreview(
     const viewer = viewerRef.current;
     if (!viewer) return;
     let cancelled = false;
-    void applyMode(viewer, mode, orbit, upsideDown).then((ma) => {
-      if (!cancelled) modeAnimRef.current = ma;
-    });
+    setReady(false);
+    setError(null);
+    modeAnimRef.current = null;
+    void applyMode(viewer, mode, orbit, upsideDown)
+      .then((ma) => {
+        if (!cancelled) {
+          modeAnimRef.current = ma;
+          setReady(true);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setError("3D preview failed to update. Try reloading the player.");
+        }
+      });
     return () => {
       cancelled = true;
     };
@@ -167,13 +200,13 @@ export function usePreview(
     async (req: CaptureRequest): Promise<Blob> => {
       const viewer = viewerRef.current;
       const modeAnim = modeAnimRef.current;
-      if (!viewer || !modeAnim) {
+      if (!viewer || !modeAnim || !ready) {
         throw new Error("Preview is not ready yet.");
       }
       await fontReadyRef.current; // ensure nametag font is painted before first frame
       return captureViewerGif(viewer, modeAnim, { ...req, orbit, upsideDown });
     },
-    [orbit, upsideDown]
+    [orbit, ready, upsideDown]
   );
 
   // Pause the live render loop during GIF export so the capture drives frames exclusively.
@@ -216,5 +249,5 @@ export function usePreview(
     };
   }, [showNametag, profile, upsideDown]);
 
-  return { canvasRef, captureGif };
+  return { canvasRef, captureGif, ready, error };
 }

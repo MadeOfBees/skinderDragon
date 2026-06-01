@@ -5,17 +5,21 @@ import {
   ProfileError,
 } from "./providers";
 
-const SKIN_URL = "http://textures.minecraft.net/texture/skinhash";
-const CAPE_URL = "http://textures.minecraft.net/texture/capehash";
+const RAW_SKIN_URL = "http://textures.minecraft.net/texture/abc123";
+const RAW_CAPE_URL = "http://textures.minecraft.net/texture/c0ffee";
+const SKIN_URL = "https://textures.minecraft.net/texture/abc123";
+const CAPE_URL = "https://textures.minecraft.net/texture/c0ffee";
 
-function texturesValue(opts: { slim?: boolean; cape?: boolean } = {}): string {
+function texturesValue(
+  opts: { slim?: boolean; cape?: boolean; skinUrl?: string; capeUrl?: string } = {}
+): string {
   const textures: Record<string, unknown> = {
     SKIN: {
-      url: SKIN_URL,
+      url: opts.skinUrl ?? RAW_SKIN_URL,
       ...(opts.slim ? { metadata: { model: "slim" } } : {}),
     },
   };
-  if (opts.cape) textures.CAPE = { url: CAPE_URL };
+  if (opts.cape) textures.CAPE = { url: opts.capeUrl ?? RAW_CAPE_URL };
   return btoa(JSON.stringify({ textures }));
 }
 
@@ -39,6 +43,22 @@ function playerdbOk(opts: { slim?: boolean; cape?: boolean } = {}) {
   } as unknown as Response;
 }
 
+function geyserOk(body: unknown) {
+  return {
+    ok: true,
+    status: 200,
+    json: async () => body,
+  } as unknown as Response;
+}
+
+function geyserError(status: number) {
+  return {
+    ok: false,
+    status,
+    json: async () => ({}),
+  } as unknown as Response;
+}
+
 describe("decodeTexturesProperty", () => {
   it("decodes a classic skin without a cape", () => {
     const r = decodeTexturesProperty(texturesValue());
@@ -58,6 +78,20 @@ describe("decodeTexturesProperty", () => {
     expect(() => decodeTexturesProperty(btoa(JSON.stringify({ textures: {} })))).toThrow(
       /no skin/i
     );
+  });
+
+  it("rejects a skin URL outside Mojang's texture CDN", () => {
+    expect(() =>
+      decodeTexturesProperty(texturesValue({ skinUrl: "https://example.com/skin.png" }))
+    ).toThrow(/Mojang/);
+  });
+
+  it("rejects a cape URL outside Mojang's texture CDN", () => {
+    expect(() =>
+      decodeTexturesProperty(
+        texturesValue({ cape: true, capeUrl: "https://example.com/cape.png" })
+      )
+    ).toThrow(/Mojang/);
   });
 });
 
@@ -124,5 +158,63 @@ describe("resolveTextures lookup", () => {
       }),
     } as unknown as Response);
     await expect(resolveTextures("Notch", fetchImpl)).rejects.toThrow(/no skin data/i);
+  });
+});
+
+describe("resolveTextures bedrock lookup", () => {
+  it("resolves a gamertag through Geyser XUID and skin endpoints", async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(geyserOk({ xuid: 253542848 }))
+      .mockResolvedValueOnce(
+        geyserOk({ value: texturesValue({ cape: true }), is_steve: false })
+      );
+
+    const r = await resolveTextures("Bedrock Steve", fetchImpl, "bedrock");
+
+    expect(fetchImpl).toHaveBeenNthCalledWith(
+      1,
+      "https://api.geysermc.org/v2/xbox/xuid/Bedrock%20Steve"
+    );
+    expect(fetchImpl).toHaveBeenNthCalledWith(
+      2,
+      "https://api.geysermc.org/v2/skin/253542848"
+    );
+    expect(r).toEqual({
+      playerId: "253542848",
+      username: "Bedrock Steve",
+      slim: true,
+      skinTextureUrl: SKIN_URL,
+      capeTextureUrl: CAPE_URL,
+    });
+  });
+
+  it("errors when Geyser has no cached skin value", async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(geyserOk({ xuid: 253542848 }))
+      .mockResolvedValueOnce(geyserOk({ value: "", is_steve: true }));
+
+    await expect(resolveTextures("Bedrock Steve", fetchImpl, "bedrock")).rejects.toThrow(
+      /skin isn't available/i
+    );
+  });
+
+  it("maps a non-ok XUID lookup to a missing Bedrock player", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(geyserError(503));
+
+    await expect(resolveTextures("Bedrock Steve", fetchImpl, "bedrock")).rejects.toThrow(
+      /no bedrock player/i
+    );
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects invalid gamertags before calling Geyser", async () => {
+    const fetchImpl = vi.fn();
+
+    await expect(resolveTextures("bad_name!", fetchImpl, "bedrock")).rejects.toThrow(
+      /gamertags are 1.16 characters/i
+    );
+    expect(fetchImpl).not.toHaveBeenCalled();
   });
 });

@@ -13,6 +13,7 @@
 //   node scripts/refresh-assets.mjs --snapshot   # snapshot panorama only
 //   node scripts/refresh-assets.mjs 1.21.4 release  # pin a version → release/
 //   node scripts/refresh-assets.mjs --ensure     # skip if all files already present
+//   node scripts/refresh-assets.mjs --ensure --strict  # fail if missing assets cannot be fetched
 //
 // Panorama faces are heavily blurred/darkened behind the UI, so we downscale
 // to keep the bundle small. Bump EDGE if you ever want crisper faces.
@@ -35,11 +36,101 @@ const FACE_COUNT = 6; // 0-3 sides, 4 top, 5 bottom
 const EDGE = 512; // px per face after downscale
 const WEBP_QUALITY = 82;
 const FAVICON_SIZE = 32; // px — renders crisp at 16×16 browser display size
+const MOJANG_TEXTURE_HOST = "textures.minecraft.net";
+const MOJANG_TEXTURE_PATH = /^\/texture\/[0-9a-f]+$/i;
+const MAX_TEXTURE_BYTES = 1_048_576;
+const MAX_TEXTURE_DIMENSION = 1024;
+const MAX_TEXTURE_PIXELS = MAX_TEXTURE_DIMENSION * MAX_TEXTURE_DIMENSION;
+const TEXTURE_FETCH_TIMEOUT_MS = 10_000;
+const MINECRAFT_TEXTURE_TYPES = new Set([
+  "image/png",
+  "application/octet-stream",
+  "binary/octet-stream",
+]);
 
 async function getJson(url) {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`GET ${url} → HTTP ${res.status}`);
   return res.json();
+}
+
+function toMojangTextureUrl(url) {
+  let parsed;
+  try {
+    parsed = new URL(url.replace(/^http:\/\//i, "https://"));
+  } catch {
+    throw new Error("Texture URL must be a valid Mojang texture URL.");
+  }
+
+  if (
+    parsed.protocol !== "https:" ||
+    parsed.hostname !== MOJANG_TEXTURE_HOST ||
+    parsed.username ||
+    parsed.password ||
+    parsed.port ||
+    !MOJANG_TEXTURE_PATH.test(parsed.pathname) ||
+    parsed.search ||
+    parsed.hash
+  ) {
+    throw new Error("Texture URL must come from Mojang's texture CDN.");
+  }
+
+  return parsed.href;
+}
+
+async function fetchTextureBuffer(url) {
+  const safeUrl = toMojangTextureUrl(url);
+  const skinRes = await fetch(safeUrl, {
+    signal: AbortSignal.timeout(TEXTURE_FETCH_TIMEOUT_MS),
+  });
+  if (!skinRes.ok) throw new Error(`Skin download → HTTP ${skinRes.status}`);
+
+  const contentType = mediaType(skinRes.headers.get("content-type"));
+  if (!MINECRAFT_TEXTURE_TYPES.has(contentType)) {
+    throw new Error("Skin download must be a Minecraft texture image.");
+  }
+
+  const contentLength = skinRes.headers.get("content-length");
+  if (contentLength) {
+    const bytes = Number(contentLength);
+    if (!Number.isFinite(bytes) || bytes < 0 || bytes > MAX_TEXTURE_BYTES) {
+      throw new Error("Skin download is too large.");
+    }
+  }
+
+  const skinBuffer = Buffer.from(await skinRes.arrayBuffer());
+  if (skinBuffer.length > MAX_TEXTURE_BYTES) {
+    throw new Error("Skin download is too large.");
+  }
+  return skinBuffer;
+}
+
+function mediaType(value) {
+  return value?.split(";", 1)[0]?.trim().toLowerCase() ?? "";
+}
+
+function isMinecraftTextureSize(width, height) {
+  return (
+    Number.isInteger(width) &&
+    Number.isInteger(height) &&
+    width >= 64 &&
+    height >= 32 &&
+    width <= MAX_TEXTURE_DIMENSION &&
+    height <= MAX_TEXTURE_DIMENSION &&
+    width % 32 === 0 &&
+    height % 32 === 0 &&
+    (width === height || width === height * 2)
+  );
+}
+
+async function assertMinecraftTexture(buffer) {
+  const metadata = await sharp(buffer, { limitInputPixels: MAX_TEXTURE_PIXELS }).metadata();
+  if (!metadata.width || !metadata.height) {
+    throw new Error("Skin download is not a readable image.");
+  }
+  if (!isMinecraftTextureSize(metadata.width, metadata.height)) {
+    throw new Error("Skin image dimensions are not valid for a Minecraft texture.");
+  }
 }
 
 /** Returns true if all six face files already exist for the given channel. */
@@ -139,19 +230,18 @@ async function refreshFavicon() {
   const skinUrl = textures.textures?.SKIN?.url;
   if (!skinUrl) throw new Error("Could not find MHF_Steve's skin URL");
 
-  const skinRes = await fetch(skinUrl);
-  if (!skinRes.ok) throw new Error(`Skin download → HTTP ${skinRes.status}`);
-  const skinBuffer = Buffer.from(await skinRes.arrayBuffer());
+  const skinBuffer = await fetchTextureBuffer(skinUrl);
+  await assertMinecraftTexture(skinBuffer);
 
   // The skin sheet is 64×64. Face is at (8,8), hat overlay at (40,8), both 8×8.
   // We scale both to FAVICON_SIZE with nearest-neighbour, then composite hat over face.
-  const faceBuffer = await sharp(skinBuffer)
+  const faceBuffer = await sharp(skinBuffer, { limitInputPixels: MAX_TEXTURE_PIXELS })
     .extract({ left: 8, top: 8, width: 8, height: 8 })
     .resize(FAVICON_SIZE, FAVICON_SIZE, { kernel: "nearest" })
     .png()
     .toBuffer();
 
-  const hatBuffer = await sharp(skinBuffer)
+  const hatBuffer = await sharp(skinBuffer, { limitInputPixels: MAX_TEXTURE_PIXELS })
     .extract({ left: 40, top: 8, width: 8, height: 8 })
     .resize(FAVICON_SIZE, FAVICON_SIZE, { kernel: "nearest" })
     .png()
@@ -171,7 +261,8 @@ async function refreshFavicon() {
 async function main() {
   const args = process.argv.slice(2);
   const ensure = args.includes("--ensure");
-  const rest = args.filter((a) => a !== "--ensure");
+  const strict = args.includes("--strict");
+  const rest = args.filter((a) => a !== "--ensure" && a !== "--strict");
 
   if (ensure) {
     const panoramaOk =
@@ -183,7 +274,8 @@ async function main() {
       return;
     }
 
-    // Some files are missing — try to download, but don't block startup on CDN failures.
+    // Some files are missing — try to download. Dev startup uses soft ensure;
+    // production builds pass --strict so they fail instead of shipping without assets.
     try {
       if (!panoramaOk) {
         console.log("→ Fetching version manifest…");
@@ -196,6 +288,7 @@ async function main() {
       if (!faviconOk) await refreshFavicon();
       console.log("\n✅ Assets ready.");
     } catch (err) {
+      if (strict) throw err;
       console.warn(
         "⚠️  Asset ensure failed (CDN unavailable?) — starting without some assets.\n  ",
         err.message
