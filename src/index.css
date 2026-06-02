@@ -44,7 +44,7 @@
 html {
   background: var(--color-bg);
   color-scheme: dark;
-  -webkit-font-smoothing: none;
+  -webkit-font-smoothing: antialiased;
 }
 
 body {
@@ -86,10 +86,6 @@ body {
     color: inherit;
     text-decoration: none;
   }
-  /* <a> elements with mc-btn need the link underline cancelled */
-  a.mc-btn {
-    box-shadow: var(--shadow-btn-bevel);
-  }
 }
 
 /* ── Logo-style title + splash ────────────────────────────────────────────── */
@@ -118,7 +114,7 @@ body {
 
 /* ── Ore UI dark panel ────────────────────────────────────────────────────── */
 .mc-panel {
-  background: color-mix(in srgb, var(--color-panel) 92%, transparent);
+  background: var(--color-panel);
   border: var(--border-dark);
   /* OreUI 2-px pixel bevel: lighter top-left inner, darker bottom-right inner */
   box-shadow: var(--shadow-panel-bevel);
@@ -152,7 +148,6 @@ body {
 }
 /* Bedrock: gray buttons turn green on hover */
 .mc-btn:hover:not(:disabled) {
-  filter: none;
   background-color: var(--color-grass);
   box-shadow: var(--shadow-green);
 }
@@ -166,7 +161,7 @@ body {
 }
 /* OreUI disabled_btn: explicit colors, not a filter */
 .mc-btn:disabled {
-  background-color: #48494a;
+  background-color: var(--color-panel-2);
   border-color: #8c8d90;
   box-shadow: inset 0 -4px #313233;
   color: #8c8d90;
@@ -174,20 +169,16 @@ body {
 }
 
 /* ── Green button: (0-2-1)/(0-2-0) beat .mc-btn and a.mc-btn rules ── */
-a.mc-btn.mc-btn-green,
 .mc-btn.mc-btn-green {
   background-color: #3c8527;
   border-color: #1e1e1f;
   box-shadow: var(--shadow-green);
 }
-a.mc-btn.mc-btn-green:hover:not(:disabled),
 .mc-btn.mc-btn-green:hover:not(:disabled) {
-  filter: none;
   background-color: #2a641c;
   border-color: #1e1e1f;
   box-shadow: var(--shadow-green-hover);
 }
-a.mc-btn.mc-btn-green:active:not(:disabled),
 .mc-btn.mc-btn-green:active:not(:disabled) {
   filter: none;
   background-color: #1d4d13;
@@ -200,6 +191,10 @@ a.mc-btn.mc-btn-green:active:not(:disabled),
 .mc-btn-hero {
   font-size: 1.15rem;
   padding: 0.85rem 1rem;
+}
+.mc-btn-sm {
+  font-size: 0.7rem;
+  padding: 0.3rem 0.6rem;
 }
 /* Square icon button (gear, close, …): fixed box + centred glyph so the button
    is square regardless of the glyph's intrinsic width. */
@@ -262,10 +257,17 @@ a.mc-btn.mc-btn-green:active:not(:disabled),
   z-index: 0;
   pointer-events: none;
 }
+.mc-switch-track-bg svg,
+.mc-range-thumb-overlay svg,
+.mc-switch-thumb svg,
+.mc-track-cap svg,
+.mc-track-fill svg,
+.mc-track-step svg {
+  display: block;
+}
 .mc-switch-track-bg svg {
   width: 60px;
   height: 28px;
-  display: block;
 }
 /* Thumb: 16×16 units at 2px/unit = 32×32px. Protrudes 2 units (4px) above track top,
    flush with track bottom. Left flush = outer left border (−2px); right flush = +28px. */
@@ -288,7 +290,6 @@ a.mc-btn.mc-btn-green:active:not(:disabled),
 .mc-switch-thumb svg {
   width: 32px;
   height: 32px;
-  display: block;
 }
 .mc-range-wrap:hover .mc-range-thumb-overlay,
 .mc-switch:hover .mc-switch-thumb { --thumb-fill: #b1b2b5; }
@@ -350,7 +351,6 @@ a.mc-btn.mc-btn-green:active:not(:disabled),
   flex-shrink: 0;
 }
 .mc-track-cap svg {
-  display: block;
   width: 6px;
   height: 12px;
 }
@@ -363,7 +363,6 @@ a.mc-btn.mc-btn-green:active:not(:disabled),
   inset: 0;
 }
 .mc-track-fill svg {
-  display: block;
   width: 100%;
   height: 12px;
 }
@@ -379,7 +378,6 @@ a.mc-btn.mc-btn-green:active:not(:disabled),
   pointer-events: none;
 }
 .mc-track-step svg {
-  display: block;
   width: 2px;
   height: 12px;
 }
@@ -429,23 +427,10 @@ a.mc-btn.mc-btn-green:active:not(:disabled),
   box-shadow: inset 2px 2px #1e1e1f, inset -2px -2px #48494a;
   position: relative;
 }
-.mc-slot-hover::after {
-  content: "";
-  position: absolute;
-  inset: 4px;
-  background: #fff;
-  opacity: 0;
-  transition: opacity 0.1s;
-  pointer-events: none;
-}
-.mc-slot-hover:hover::after {
-  opacity: 0.2;
-}
-
 /* ── Text field ───────────────────────────────────────────────────────────── */
 .mc-input {
   font-family: var(--font-mc);
-  background: #48494a;
+  background: var(--color-panel-2);
   color: #fff;
   border: var(--border-dark);
   border-radius: 0;
@@ -549,31 +534,6 @@ a.mc-btn.mc-btn-green:active:not(:disabled),
   box-shadow: inset 0 -2px #1d4d13, inset 1px 1px rgba(255, 255, 255, 0.2);
 }
 
-/* ── Minecraft tooltip (dark, purple-bordered) ────────────────────────────── */
-.mc-tooltip {
-  position: absolute;
-  left: 50%;
-  bottom: calc(100% + 8px);
-  transform: translateX(-50%);
-  background: rgba(16, 0, 16, 0.96);
-  border: 2px solid transparent;
-  border-image: linear-gradient(#5a1fff, #2e007f) 1;
-  color: #fff;
-  padding: 6px 9px;
-  font-size: 0.72rem;
-  line-height: 1.5;
-  white-space: nowrap;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.1s;
-  z-index: 50;
-  /* OreUI tooltip inner glow */
-  box-shadow: inset 0 0 0 1px rgba(90, 31, 255, 0.25);
-}
-.mc-tooltip-host:hover .mc-tooltip {
-  opacity: 1;
-}
-
 /* ── Settings dialog (Ore UI "Options" screen) ────────────────────────────── */
 .mc-modal-backdrop {
   position: fixed;
@@ -582,17 +542,16 @@ a.mc-btn.mc-btn-green:active:not(:disabled),
   display: grid;
   place-items: center;
   padding: 1rem;
-  background: rgba(0, 0, 0, 0.7);
-  backdrop-filter: blur(2px);
+  background: #000;
 }
 .mc-modal {
   width: 100%;
   max-width: 26rem;
   padding: 0 0 1.1rem;
 }
-/* OreUI modal_title_area: #48494a strip with inset bevel — sits above modal content */
+/* OreUI modal_title_area: panel-2 strip with inset bevel — sits above modal content */
 .mc-modal-header {
-  background-color: #48494a;
+  background-color: var(--color-panel-2);
   box-shadow: inset 2px 2px rgba(255, 255, 255, 0.2),
     inset -2px -2px rgba(255, 255, 255, 0.1);
   padding: 0.65rem 1rem;
@@ -619,4 +578,10 @@ a.mc-btn.mc-btn-green:active:not(:disabled),
   image-rendering: pixelated;
 }
 
-/* Transparency indicator behind the model preview and exported GIF. */
+input[type="color"]::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+input[type="color"]::-webkit-color-swatch {
+  border: none;
+}
+

@@ -393,7 +393,7 @@ const cancelGeneration = useCallback(() => {
                     <button
                       type="button"
                       onClick={() => setBgColor(DEFAULT_BG_COLOR)}
-                      className={`mc-btn mc-btn-stone text-[0.7rem] ml-auto${bgColor === DEFAULT_BG_COLOR ? " invisible" : ""}`}
+                      className={`mc-btn mc-btn-stone mc-btn-sm ml-auto${bgColor === DEFAULT_BG_COLOR ? " invisible" : ""}`}
                     >
                       Reset
                     </button>
