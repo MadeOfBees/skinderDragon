@@ -1,9 +1,6 @@
 import { ThumbIcon } from "../icons/thumb/ThumbIcon";
-import { SliderLeftCapIcon } from "../icons/slider/SliderLeftCapIcon";
-import { SliderRightCapIcon } from "../icons/slider/SliderRightCapIcon";
-import { SliderGreyFillIcon } from "../icons/slider/SliderGreyFillIcon";
-import { SliderGreenFillIcon } from "../icons/slider/SliderGreenFillIcon";
-import { SliderStepIcon } from "../icons/slider/SliderStepIcon";
+import { UiBarStepIcon } from "../icons/uiBar/UiBarStepIcon";
+import { UiBar } from "./UiBar";
 
 interface SliderProps {
   label: string;
@@ -26,7 +23,8 @@ export function Slider({
   onChange,
   ariaLabel,
 }: SliderProps) {
-  const pct = `${((value - min) / (max - min)) * 100}%`;
+  const fill = (value - min) / (max - min);
+  const pct = `${fill * 100}%`;
   const numIntervals = (max - min) / step;
   const stepMarkers = numIntervals <= 16
     ? Array.from({ length: numIntervals - 1 }, (_, i) => (i + 1) / numIntervals)
@@ -41,19 +39,16 @@ export function Slider({
         )}
       </div>
       <div className="mc-range-track" style={{ "--pct": pct } as React.CSSProperties}>
-        <div className="mc-range-track-svgs" aria-hidden="true">
-          <div className="mc-track-cap mc-track-cap-left"><SliderLeftCapIcon /></div>
-          <div className="mc-track-fills">
-            <div className="mc-track-fill mc-track-fill-grey"><SliderGreyFillIcon /></div>
-            <div className="mc-track-fill mc-track-fill-green"><SliderGreenFillIcon /></div>
+        <UiBar value={fill} className="absolute inset-x-0 top-1/2 -translate-y-1/2 pointer-events-none" />
+        {stepMarkers.length > 0 && (
+          <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-3 pointer-events-none" aria-hidden="true">
+            {stepMarkers.map((pct) => (
+              <div key={pct} className="mc-track-step" style={{ left: `calc(3px + ${pct} * (100% - 6px))` }}>
+                <UiBarStepIcon />
+              </div>
+            ))}
           </div>
-          <div className="mc-track-cap mc-track-cap-right"><SliderRightCapIcon /></div>
-          {stepMarkers.map((pct) => (
-            <div key={pct} className="mc-track-step" style={{ left: `calc(3px + ${pct} * (100% - 6px))` }}>
-              <SliderStepIcon />
-            </div>
-          ))}
-        </div>
+        )}
         <input
           type="range"
           className="mc-range"

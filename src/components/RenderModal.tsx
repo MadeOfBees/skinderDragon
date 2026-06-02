@@ -1,5 +1,6 @@
 import { Modal } from "./Modal";
 import { PreviewSlot } from "./PreviewSlot";
+import { UiBar } from "./UiBar";
 import { DownloadIcon } from "../icons/DownloadIcon";
 
 export interface RenderModalProps {
@@ -15,6 +16,8 @@ export interface RenderModalProps {
   /** Square pixel dimension of the exported GIF, e.g. 512. */
   size: number;
   downloadName: string;
+  /** Background for the preview slot — CSS color or "transparent". */
+  background: string;
   onClose: () => void;
   onCancel: () => void;
 }
@@ -30,6 +33,7 @@ export function RenderModal({
   format,
   size,
   downloadName,
+  background,
   onClose,
   onCancel,
 }: RenderModalProps) {
@@ -44,7 +48,7 @@ export function RenderModal({
       testId="render-modal"
     >
       <div className="mc-modal-body flex w-full flex-col items-center">
-        <PreviewSlot className="relative">
+        <PreviewSlot background={background} className="relative">
           {gifUrl && !generating ? (
             <img
               data-testid="result-gif"
@@ -61,9 +65,7 @@ export function RenderModal({
 
         {generating ? (
           <>
-            <div className="mc-xp mt-4 w-full">
-              <div className="mc-xp-fill" style={{ width: `${progress * 100}%` }} />
-            </div>
+            <UiBar value={progress} className="mt-4 w-full" />
             <button
               type="button"
               onClick={onCancel}

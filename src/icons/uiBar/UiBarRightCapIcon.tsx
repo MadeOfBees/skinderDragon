@@ -1,4 +1,4 @@
-export function SliderRightCapIcon() {
+export function UiBarRightCapIcon() {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

@@ -80,14 +80,16 @@ body {
 }
 
 /* OreUI link style: box-shadow underline instead of text-decoration */
-a {
-  box-shadow: inset 0 -2px 0 0 currentColor;
-  color: inherit;
-  text-decoration: none;
-}
-/* <a> elements with mc-btn need the link underline cancelled */
-a.mc-btn {
-  box-shadow: var(--shadow-btn-bevel);
+@layer base {
+  a {
+    box-shadow: inset 0 -2px 0 0 currentColor;
+    color: inherit;
+    text-decoration: none;
+  }
+  /* <a> elements with mc-btn need the link underline cancelled */
+  a.mc-btn {
+    box-shadow: var(--shadow-btn-bevel);
+  }
 }
 
 /* ── Logo-style title + splash ────────────────────────────────────────────── */
@@ -344,17 +346,6 @@ a.mc-btn.mc-btn-green:active:not(:disabled),
   align-items: center;
   padding: 20px 0;
 }
-.mc-range-track-svgs {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  height: 12px;
-  display: flex;
-  align-items: stretch;
-  pointer-events: none;
-}
 .mc-track-cap {
   flex-shrink: 0;
 }
@@ -432,15 +423,10 @@ a.mc-btn.mc-btn-green:active:not(:disabled),
   transform: translateX(calc(-1 * var(--pct, 0%)));
 }
 
-/* ── Recessed inventory slot ──────────────────────────────────────────────── */
+/* ── Preview slot ─────────────────────────────────────────────────────────── */
 .mc-slot {
-  background: #131314;
   border: var(--border-dark);
-  /* Inverted bevel: dark top-left, lighter bottom-right (recessed look) */
-  box-shadow: inset 2px 2px #0a0a0b,
-    inset -2px -2px #48494a,
-    inset 1px 1px #1e1e1f,
-    inset -1px -1px #313233;
+  box-shadow: inset 2px 2px #1e1e1f, inset -2px -2px #48494a;
   position: relative;
 }
 .mc-slot-hover::after {
@@ -551,22 +537,6 @@ a.mc-btn.mc-btn-green:active:not(:disabled),
   outline-offset: -2px;
 }
 
-/* ── XP-bar progress ──────────────────────────────────────────────────────── */
-.mc-xp {
-  height: 14px;
-  background: #131313;
-  border: var(--border-dark);
-  overflow: hidden;
-  box-shadow: inset 1px 1px #0a0a0b, inset -1px -1px #313233;
-}
-.mc-xp-fill {
-  height: 100%;
-  background: var(--color-grass-bright);
-  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.35),
-    inset 0 -3px 0 #2a641c;
-  transition: width 0.15s linear;
-}
-
 /* ── Tag chip (cape, etc.) ────────────────────────────────────────────────── */
 .mc-tag {
   font-size: 0.6rem;
@@ -650,12 +620,3 @@ a.mc-btn.mc-btn-green:active:not(:disabled),
 }
 
 /* Transparency indicator behind the model preview and exported GIF. */
-@utility checkerboard {
-  background-color: #2a2d44;
-  background-image: linear-gradient(45deg, #22243a 25%, transparent 25%),
-    linear-gradient(-45deg, #22243a 25%, transparent 25%),
-    linear-gradient(45deg, transparent 75%, #22243a 75%),
-    linear-gradient(-45deg, transparent 75%, #22243a 75%);
-  background-size: 20px 20px;
-  background-position: 0 0, 0 10px, 10px -10px, -10px 0;
-}

@@ -100,12 +100,8 @@ describe("resolveTextures validation", () => {
     await expect(resolveTextures("   ", vi.fn())).rejects.toThrow(/enter a username/i);
   });
 
-  it("rejects illegal characters", async () => {
-    await expect(resolveTextures("bad name!", vi.fn())).rejects.toThrow(/1.16 characters/);
-  });
-
   it("rejects an overlong username", async () => {
-    await expect(resolveTextures("a".repeat(17), vi.fn())).rejects.toThrow(ProfileError);
+    await expect(resolveTextures("a".repeat(26), vi.fn())).rejects.toThrow(/up to 25 characters/i);
   });
 });
 
@@ -209,10 +205,10 @@ describe("resolveTextures bedrock lookup", () => {
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 
-  it("rejects invalid gamertags before calling Geyser", async () => {
+  it("rejects overlong gamertags before calling Geyser", async () => {
     const fetchImpl = vi.fn();
 
-    await expect(resolveTextures("bad_name!", fetchImpl, "bedrock")).rejects.toThrow(
+    await expect(resolveTextures("a".repeat(17), fetchImpl, "bedrock")).rejects.toThrow(
       /gamertags are 1.16 characters/i
     );
     expect(fetchImpl).not.toHaveBeenCalled();

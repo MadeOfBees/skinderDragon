@@ -10,14 +10,13 @@ import { Switch } from "./components/Switch";
 import { Slider } from "./components/Slider";
 import { Multibutton } from "./components/Multibutton";
 import { usePreview } from "./hooks/usePreview";
-import { renderHead, renderCape } from "./lib/head";
+import { renderHead, renderBody, renderCape } from "./lib/flatPreview";
 import { loadLastSearch, rememberLastSearch, setFavicon } from "./lib/favicon";
 import { loadPanoramaSource, savePanoramaSource, loadEdition, saveEdition } from "./lib/settings";
 import type { Edition } from "./lib/providers";
 import { randomSplash } from "./data/splashes";
 import { Button } from "./components/Button";
 import { SettingsIcon } from "./icons/SettingsIcon";
-import { DownloadIcon } from "./icons/DownloadIcon";
 
 function ControlGroup({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -36,6 +35,8 @@ const POSE_LABELS: Record<Pose, string> = {
   run: "Run",
   fly: "Fly",
 };
+
+const DEFAULT_BG_COLOR = "#313233";
 
 const FLIP_NAMES = /^(dinnerbone|grumm)$/i;
 
@@ -59,13 +60,14 @@ export function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [headUrl, setHeadUrl] = useState<string | null>(null);
+  const [bodyUrl, setBodyUrl] = useState<string | null>(null);
   const [capeUrl, setCapeUrl] = useState<string | null>(null);
 
   const [pose, setPose] = useState<Pose>("stand");
   const [orbit, setOrbit] = useState(true);
   const [showNametag, setShowNametag] = useState(false);
   const [bgKind, setBgKind] = useState<"transparent" | "color">("color");
-  const [bgColor, setBgColor] = useState("#1d2030");
+  const [bgColor, setBgColor] = useState(DEFAULT_BG_COLOR);
 
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [panoramaSource, setPanoramaSource] = useState<PanoramaSource>(loadPanoramaSource);
@@ -109,6 +111,17 @@ const generationAbortRef = useRef<AbortController | null>(null);
       setHeadUrl(url);
       rememberLastSearch(profile.username, url);
     });
+    return () => {
+      active = false;
+    };
+  }, [profile]);
+
+  // Render a flat front-facing 2D doll of the player.
+  useEffect(() => {
+    setBodyUrl(null);
+    if (!profile) return;
+    let active = true;
+    renderBody(profile.skinUrl, profile.slim).then((url) => active && setBodyUrl(url));
     return () => {
       active = false;
     };
@@ -247,6 +260,7 @@ const cancelGeneration = useCallback(() => {
           size={GIF_OVERRIDES.size ?? DEFAULT_GIF_SIZE}
           format={renderFormat}
           downloadName={`${profile.username}-${pose}${orbit ? "-orbit" : ""}.${renderFormat}`}
+          background={bgKind === "transparent" ? "transparent" : bgColor}
           onClose={closeRenderModal}
           onCancel={cancelGeneration}
         />
@@ -273,9 +287,9 @@ const cancelGeneration = useCallback(() => {
         />
 
         {profile && (
-          <main className="mt-8 grid items-start gap-6 justify-items-center md:grid-cols-[340px_1fr] md:justify-items-stretch">
-            <div className="flex flex-col items-center gap-3">
-              <PreviewSlot>
+          <main className="mt-8 grid items-start gap-6 justify-items-center md:grid-cols-[384px_1fr] md:justify-items-stretch">
+            <div className="mc-panel m-0 p-3.5 flex flex-col items-center gap-3">
+              <PreviewSlot background={bgKind === "transparent" ? "transparent" : bgColor}>
                 <canvas ref={canvasRef} className="block cursor-grab active:cursor-grabbing" />
               </PreviewSlot>
               {previewError && (
@@ -283,50 +297,58 @@ const cancelGeneration = useCallback(() => {
                   {previewError}
                 </p>
               )}
-              <span className="inline-flex items-center gap-2">
-                {headUrl && (
-                  <img src={headUrl} alt="" className="pixelated h-6 w-6 border-2 border-black" />
-                )}
-                <span data-testid="player-name" className="text-sm">
-                  {profile.username}
-                </span>
-                {profile.capeUrl && (
-                  <span data-testid="cape-badge" title="Cape" className="inline-flex">
-                    {capeUrl ? (
-                      <img
-                        src={capeUrl}
-                        alt={`${profile.username}'s cape`}
-                        // Scale with the username text rather than towering over
-                        // it: ~1.25em tall, keeping the cape's 10:16 aspect.
-                        className="pixelated h-[1.25em] w-auto border border-black"
-                      />
-                    ) : (
-                      <span className="mc-tag">cape</span>
-                    )}
-                  </span>
-                )}
-              </span>
-
-              <div className="flex gap-2">
-                <a
-                  data-testid="download-skin"
-                  href={profile.skinUrl}
-                  download={`${profile.username}-skin.png`}
-                  className="mc-btn mc-btn-stone text-[0.7rem]"
-                >
-                  <DownloadIcon /> Skin PNG
-                </a>
+              <div className="flex w-full items-center">
                 {headUrl && (
                   <a
-                    data-testid="download-head"
                     href={headUrl}
                     download={`${profile.username}-head.png`}
-                    className="mc-btn mc-btn-stone text-[0.7rem]"
+                    title="Download head"
                   >
-                    <DownloadIcon /> Head PNG
+                    <img src={headUrl} alt="" className="pixelated block h-12 w-12 border-2 border-black cursor-pointer" />
                   </a>
                 )}
+                <span data-testid="player-name" className="flex-1 text-center text-lg">
+                  {profile.username}
+                </span>
+                <div className="flex items-center gap-2">
+                  {bodyUrl && (
+                    <a
+                      data-testid="download-skin"
+                      href={profile.skinUrl}
+                      download={`${profile.username}-skin.png`}
+                      title="Download skin"
+                      className="shadow-none"
+                    >
+                      <img
+                        data-testid="body-preview"
+                        src={bodyUrl}
+                        alt={`${profile.username} front view`}
+                        className="pixelated block h-12 w-auto cursor-pointer"
+                      />
+                    </a>
+                  )}
+                  {profile.capeUrl && (
+                    <span data-testid="cape-badge" title="Download cape" className="inline-flex">
+                      {capeUrl ? (
+                        <a
+                          href={profile.capeUrl}
+                          download={`${profile.username}-cape.png`}
+                          title="Download cape"
+                        >
+                          <img
+                            src={capeUrl}
+                            alt={`${profile.username}'s cape`}
+                            className="pixelated h-12 w-auto border border-black cursor-pointer"
+                          />
+                        </a>
+                      ) : (
+                        <span className="mc-tag">cape</span>
+                      )}
+                    </span>
+                  )}
+                </div>
               </div>
+
             </div>
 
             <div className="flex w-full max-w-90 flex-col gap-4">
@@ -358,15 +380,24 @@ const cancelGeneration = useCallback(() => {
                   onChange={(v: "color" | "transparent") => setBgKind(v)}
                 />
                 {bgKind === "color" && (
-                  <label className="mt-3 flex items-center gap-2.5 text-sm text-muted">
-                    <input
-                      type="color"
-                      value={bgColor}
-                      onChange={(e) => setBgColor(e.target.value)}
-                      className="h-9 w-12 cursor-pointer border-2 border-black bg-transparent p-0"
-                    />
-                    <span>{bgColor}</span>
-                  </label>
+                  <div className="mt-3 flex items-center gap-2.5">
+                    <label className="flex items-center gap-2.5 text-sm text-muted">
+                      <input
+                        type="color"
+                        value={bgColor}
+                        onChange={(e) => setBgColor(e.target.value)}
+                        className="h-9 w-12 cursor-pointer border-2 border-black bg-transparent p-0"
+                      />
+                      <span>{bgColor}</span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setBgColor(DEFAULT_BG_COLOR)}
+                      className={`mc-btn mc-btn-stone text-[0.7rem] ml-auto${bgColor === DEFAULT_BG_COLOR ? " invisible" : ""}`}
+                    >
+                      Reset
+                    </button>
+                  </div>
                 )}
               </ControlGroup>
 

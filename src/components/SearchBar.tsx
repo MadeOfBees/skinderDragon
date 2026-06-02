@@ -28,7 +28,7 @@ export function SearchBar({
           placeholder={placeholder}
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="mc-input flex-1 text-base"
+          className="mc-input flex-1 min-w-0 text-base"
           autoComplete="off"
           spellCheck={false}
         />

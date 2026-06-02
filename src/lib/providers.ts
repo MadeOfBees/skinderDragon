@@ -29,11 +29,13 @@ export interface ResolvedTextures {
 
 export class ProfileError extends Error {}
 
-/** Java usernames: 1–16 of [A-Za-z0-9_]. */
-export const USERNAME_RE = /^[A-Za-z0-9_]{1,16}$/;
+// Legacy accounts (pre-2010) predate Mojang's character restrictions and can
+// contain dots, spaces, and other special chars — so we only validate length.
+export const USERNAME_RE = /^.{1,25}$/;
 
-/** Xbox gamertags: 1–16 of letters, digits, spaces. */
-export const GAMERTAG_RE = /^[A-Za-z0-9 ]{1,16}$/;
+// The 2019 Xbox refresh allows Unicode letters (Japanese, Chinese, Arabic, etc.)
+// so we only validate length.
+export const GAMERTAG_RE = /^.{1,16}$/;
 
 const PLAYERDB = "https://playerdb.co/api/player/minecraft/";
 const GEYSER = "https://api.geysermc.org/v2";
@@ -102,9 +104,7 @@ async function resolveJavaTextures(
   const name = rawName.trim();
   if (!name) throw new ProfileError("Enter a username.");
   if (!USERNAME_RE.test(name)) {
-    throw new ProfileError(
-      "Usernames are 1–16 characters: letters, numbers and underscores only."
-    );
+    throw new ProfileError("Usernames are up to 25 characters.");
   }
 
   let res: Response;
@@ -150,9 +150,7 @@ async function resolveBedrockTextures(
   const name = rawName.trim();
   if (!name) throw new ProfileError("Enter a gamertag.");
   if (!GAMERTAG_RE.test(name)) {
-    throw new ProfileError(
-      "Gamertags are 1–16 characters: letters, numbers and spaces only."
-    );
+    throw new ProfileError("Gamertags are 1–16 characters.");
   }
 
   // Step 1: gamertag → XUID

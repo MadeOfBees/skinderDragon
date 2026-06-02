@@ -137,7 +137,7 @@ describe("<App>", () => {
       expect.anything(),
       expect.objectContaining({
         orbit: true,
-        background: { kind: "color", color: "#1d2030" },
+        background: { kind: "color", color: "#313233" },
       })
     );
     const link = await screen.findByRole("link", { name: /download/i });
@@ -221,7 +221,7 @@ describe("<App>", () => {
       expect.anything(),
       expect.objectContaining({
         orbit: false,
-        background: { kind: "color", color: "#1d2030" },
+        background: { kind: "color", color: "#313233" },
       })
     );
     const link = await screen.findByRole("link", { name: /download png/i });
@@ -256,8 +256,8 @@ describe("<App>", () => {
     await loadUser("EthosLab");
     await screen.findByText("EthosLab");
 
-    expect(screen.getByText("#1d2030")).toBeInTheDocument();
+    expect(screen.getByText("#313233")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: /transparent/i }));
-    expect(screen.queryByText("#1d2030")).not.toBeInTheDocument();
+    expect(screen.queryByText("#313233")).not.toBeInTheDocument();
   });
 });
