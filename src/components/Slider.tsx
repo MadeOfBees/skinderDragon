@@ -26,7 +26,7 @@ export function Slider({
   const fill = (value - min) / (max - min);
   const pct = `${fill * 100}%`;
   const numIntervals = (max - min) / step;
-  const stepMarkers = numIntervals <= 16
+  const stepMarkers = numIntervals <= 24
     ? Array.from({ length: numIntervals - 1 }, (_, i) => (i + 1) / numIntervals)
     : [];
 
@@ -39,11 +39,11 @@ export function Slider({
         )}
       </div>
       <div className="mc-range-track" style={{ "--pct": pct } as React.CSSProperties}>
-        <UiBar value={fill} className="absolute inset-x-0 top-1/2 -translate-y-1/2 pointer-events-none" />
+        <UiBar value={fill} className="mc-range-overlay" />
         {stepMarkers.length > 0 && (
-          <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-3 pointer-events-none" aria-hidden="true">
+          <div className="mc-range-overlay mc-range-overlay-steps" aria-hidden="true">
             {stepMarkers.map((pct) => (
-              <div key={pct} className="mc-track-step" style={{ left: `calc(3px + ${pct} * (100% - 6px))` }}>
+              <div key={pct} className="mc-track-step" style={{ left: `${pct * 100}%` }}>
                 <UiBarStepIcon />
               </div>
             ))}

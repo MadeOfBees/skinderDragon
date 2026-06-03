@@ -49,6 +49,12 @@ vi.mock("./lib/profile", () => ({
   fetchProfile: vi.fn(),
 }));
 
+vi.mock("./lib/flatPreview", () => ({
+  renderHead: vi.fn().mockResolvedValue(null),
+  renderBody: vi.fn().mockResolvedValue(null),
+  renderCape: vi.fn().mockResolvedValue("data:image/png;base64,cape"),
+}));
+
 // The preview hook captures straight from the live viewer via captureViewerGif /
 // captureViewerPng; stub both out (no real WebGL in jsdom).
 vi.mock("./lib/exportGif", async (importOriginal) => {
@@ -108,7 +114,7 @@ describe("<App>", () => {
     await loadUser("jeb_");
 
     expect(await screen.findByText("jeb_")).toBeInTheDocument();
-    expect(screen.getByTestId("cape-badge")).toBeInTheDocument();
+    expect(await screen.findByTestId("cape-badge")).toBeInTheDocument();
   });
 
   it("surfaces a friendly error for unknown players", async () => {

@@ -15,12 +15,12 @@ function SettingRow({
   children: ReactNode;
 }) {
   return (
-    <div className="flex items-center justify-between gap-4 py-2.5">
-      <div className="min-w-0">
-        <div className="text-sm">{label}</div>
-        {hint && <p className="mt-0.5 text-[0.7rem] leading-snug text-muted">{hint}</p>}
+    <div className="mc-setting-row">
+      <div>
+        <div className="mc-setting-title">{label}</div>
+        {hint && <p className="mc-hint">{hint}</p>}
       </div>
-      <div className="shrink-0">{children}</div>
+      <div>{children}</div>
     </div>
   );
 }
@@ -77,7 +77,7 @@ export function Settings({
         <button
           type="button"
           onClick={onClose}
-          className="mc-btn mc-btn-green mc-btn-hero mt-4 w-full"
+          className="mc-btn mc-btn-green mc-btn-hero mc-btn-block mt-4"
         >
           Done
         </button>

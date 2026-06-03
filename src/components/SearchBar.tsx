@@ -1,5 +1,6 @@
 import type { FormEvent } from "react";
 import { SearchIcon } from "../icons/SearchIcon";
+import { cn } from "../lib/ui";
 
 interface SearchBarProps {
   value: string;
@@ -21,14 +22,14 @@ export function SearchBar({
   className = "",
 }: SearchBarProps) {
   return (
-    <div className={`mc-panel p-3.5 ${className}`}>
-      <form className="mc-search-bar flex items-center" onSubmit={onSubmit}>
+    <div className={cn("mc-panel", className)}>
+      <form className="mc-search-bar" onSubmit={onSubmit}>
         <input
           type="text"
           placeholder={placeholder}
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="mc-input flex-1 min-w-0 text-base"
+          className="mc-input"
           autoComplete="off"
           spellCheck={false}
         />
@@ -37,7 +38,7 @@ export function SearchBar({
         </button>
       </form>
       {error && (
-        <p data-testid="error" className="mt-3 text-center text-sm text-red-300">
+        <p data-testid="error" className="mc-error mt-3">
           {error}
         </p>
       )}

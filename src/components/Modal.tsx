@@ -1,6 +1,7 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { Button } from "./Button";
 import { CloseIcon } from "../icons/CloseIcon";
+import { cn } from "../lib/ui";
 
 interface ModalProps {
   open: boolean;
@@ -105,12 +106,12 @@ export function Modal({
     >
       <div
         ref={panelRef}
-        className={["mc-panel mc-modal mc-dialog-in", panelClassName].filter(Boolean).join(" ")}
+        className={cn("mc-panel mc-modal mc-dialog-in", panelClassName)}
         onClick={(e) => e.stopPropagation()}
         tabIndex={-1}
       >
-        <header className="mc-modal-header flex w-full items-center justify-between gap-3">
-          <h2 className="mc-title text-[1.1rem]">{title}</h2>
+        <header className="mc-modal-header">
+          <h2 className="mc-title">{title}</h2>
           <Button
             aria-label="Close"
             onClick={onClose}

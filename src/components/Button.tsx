@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { cn } from "../lib/ui";
 
 interface ButtonProps {
   "aria-label": string;
@@ -27,7 +28,7 @@ export function Button({
       onClick={onClick}
       disabled={disabled}
       data-testid={testId}
-      className={`mc-btn mc-btn-stone mc-btn-icon${className ? ` ${className}` : ""}`}
+      className={cn("mc-btn mc-btn-stone mc-btn-icon", className)}
     >
       {children}
     </button>

@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react";
+import { cn } from "../lib/ui";
 import { UiBarLeftCapIcon } from "../icons/uiBar/UiBarLeftCapIcon";
 import { UiBarRightCapIcon } from "../icons/uiBar/UiBarRightCapIcon";
 import { UiBarGreyFillIcon } from "../icons/uiBar/UiBarGreyFillIcon";
@@ -15,7 +16,7 @@ export function UiBar({ value, className }: UiBarProps) {
   return (
     <div
       aria-hidden="true"
-      className={["h-3 flex items-stretch", className].filter(Boolean).join(" ")}
+      className={cn("mc-uibar", className)}
       style={{ "--pct": pct } as CSSProperties}
     >
       <div className="mc-track-cap mc-track-cap-left"><UiBarLeftCapIcon /></div>

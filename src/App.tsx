@@ -17,10 +17,11 @@ import type { Edition } from "./lib/providers";
 import { randomSplash } from "./data/splashes";
 import { Button } from "./components/Button";
 import { SettingsIcon } from "./icons/SettingsIcon";
+import { cn } from "./lib/ui";
 
 function ControlGroup({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div role="group" aria-label={label} className="mc-panel m-0 p-3.5">
+    <div role="group" aria-label={label} className="mc-panel">
       <p className="mc-section-label">{label}</p>
       {children}
     </div>
@@ -138,12 +139,18 @@ const generationAbortRef = useRef<AbortController | null>(null);
     };
   }, [profile]);
 
-  // Revoke object URLs when they're replaced or on unmount.
+  // Revoke previous profile's blob URLs when profile changes. Ref-based comparison
+  // prevents StrictMode's double-invocation from revoking the current profile's URLs
+  // before the cape/skin render effects complete (which would cause renderCape to fail).
+  const prevProfileUrlsRef = useRef<{ skin: string; cape: string | null } | null>(null);
   useEffect(() => {
-    return () => {
-      if (profile?.capeUrl) URL.revokeObjectURL(profile.capeUrl);
-      if (profile?.skinUrl) URL.revokeObjectURL(profile.skinUrl);
-    };
+    const prev = prevProfileUrlsRef.current;
+    const curr = profile ? { skin: profile.skinUrl, cape: profile.capeUrl } : null;
+    if (prev && prev.skin !== curr?.skin) {
+      URL.revokeObjectURL(prev.skin);
+      if (prev.cape) URL.revokeObjectURL(prev.cape);
+    }
+    prevProfileUrlsRef.current = curr;
   }, [profile]);
   useEffect(() => {
     return () => {
@@ -236,7 +243,7 @@ const cancelGeneration = useCallback(() => {
         aria-label="Settings"
         title="Settings"
         onClick={() => setSettingsOpen(true)}
-        className="mc-btn-gear fixed top-3 right-3 z-50"
+        className="mc-btn-gear"
       >
         <SettingsIcon />
       </Button>
@@ -266,11 +273,11 @@ const cancelGeneration = useCallback(() => {
         />
       )}
 
-      <div className="relative z-0 mx-auto w-full max-w-3xl px-5 pt-10 pb-24">
-        <header className="mb-8 text-center">
-          <span className="relative inline-block">
-            <h1 className="mc-title text-[1.5rem] sm:text-[2.1rem]">skinderdragon</h1>
-            <span className="mc-splash absolute -right-4 -bottom-2 text-[0.5rem] sm:text-[0.58rem]">
+      <div className="mc-page">
+        <header className="mc-app-header">
+          <span className="mc-app-title-wrap">
+            <h1 className="mc-title mc-app-title">skinderdragon</h1>
+            <span className="mc-splash">
               {splash}
             </span>
           </span>
@@ -283,77 +290,70 @@ const cancelGeneration = useCallback(() => {
           disabled={loading}
           placeholder={edition === "bedrock" ? "Bedrock gamertag…" : "Java username…"}
           error={error}
-          className="mx-auto w-full max-w-md"
+          className="mc-searchbar"
         />
 
         {profile && (
-          <main className="mt-8 grid items-start gap-6 justify-items-center md:grid-cols-[384px_1fr] md:justify-items-stretch">
-            <div className="mc-panel m-0 p-3.5 flex flex-col items-center gap-3">
+          <main className="mc-main-grid">
+            <div className="mc-panel mc-col-center mc-preview-col">
               <PreviewSlot background={bgKind === "transparent" ? "transparent" : bgColor}>
-                <canvas ref={canvasRef} className="block cursor-grab active:cursor-grabbing" />
+                <canvas ref={canvasRef} className="mc-canvas" />
               </PreviewSlot>
               {previewError && (
-                <p data-testid="preview-error" className="max-w-80 text-center text-sm text-red-300">
+                <p data-testid="preview-error" className="mc-error">
                   {previewError}
                 </p>
               )}
-              <div className="flex w-full items-center">
+              <div className="mc-asset-row">
                 {headUrl && (
                   <a
                     href={headUrl}
                     download={`${profile.username}-head.png`}
                     title="Download head"
                   >
-                    <img src={headUrl} alt="" className="pixelated block h-12 w-12 border-2 border-black cursor-pointer" />
+                    <img src={headUrl} alt="" className="mc-asset-img" />
                   </a>
                 )}
-                <span data-testid="player-name" className="flex-1 text-center text-lg">
+                <span data-testid="player-name" className="mc-player-name">
                   {profile.username}
                 </span>
-                <div className="flex items-center gap-2">
+                <div className="mc-asset-group">
                   {bodyUrl && (
                     <a
                       data-testid="download-skin"
                       href={profile.skinUrl}
                       download={`${profile.username}-skin.png`}
                       title="Download skin"
-                      className="shadow-none"
                     >
                       <img
                         data-testid="body-preview"
                         src={bodyUrl}
                         alt={`${profile.username} front view`}
-                        className="pixelated block h-12 w-auto cursor-pointer"
+                        className="mc-asset-img"
                       />
                     </a>
                   )}
-                  {profile.capeUrl && (
-                    <span data-testid="cape-badge" title="Download cape" className="inline-flex">
-                      {capeUrl ? (
-                        <a
-                          href={profile.capeUrl}
-                          download={`${profile.username}-cape.png`}
-                          title="Download cape"
-                        >
-                          <img
-                            src={capeUrl}
-                            alt={`${profile.username}'s cape`}
-                            className="pixelated h-12 w-auto border border-black cursor-pointer"
-                          />
-                        </a>
-                      ) : (
-                        <span className="mc-tag">cape</span>
-                      )}
-                    </span>
+                  {capeUrl && (
+                    <a
+                      data-testid="cape-badge"
+                      href={profile.capeUrl!}
+                      download={`${profile.username}-cape.png`}
+                      title="Download cape"
+                    >
+                      <img
+                        src={capeUrl}
+                        alt={`${profile.username}'s cape`}
+                        className="mc-asset-img"
+                      />
+                    </a>
                   )}
                 </div>
               </div>
-
             </div>
 
-            <div className="flex w-full max-w-90 flex-col gap-4">
+            <div className="mc-controls-col">
               <ControlGroup label="Animation">
-                <div className="flex flex-col gap-2">
+                <div className="mc-anim-controls">
                   <Slider
                     label="Pose"
                     value={POSE_ORDER.indexOf(pose)}
@@ -363,7 +363,7 @@ const cancelGeneration = useCallback(() => {
                     onChange={(i: number) => setPose(POSE_ORDER[i])}
                     ariaLabel="Pose"
                   />
-                  <div className="flex flex-col gap-2 px-0.5">
+                  <div className="mc-switch-group">
                     <Switch label="Orbit" checked={orbit} onChange={() => setOrbit((o) => !o)} />
                     <Switch label="Nametag" checked={showNametag} onChange={() => setShowNametag((n) => !n)} />
                   </div>
@@ -380,20 +380,23 @@ const cancelGeneration = useCallback(() => {
                   onChange={(v: "color" | "transparent") => setBgKind(v)}
                 />
                 {bgKind === "color" && (
-                  <div className="mt-3 flex items-center gap-2.5">
-                    <label className="flex items-center gap-2.5 text-sm text-muted">
+                  <div className="mc-color-row">
+                    <label className="mc-color-label">
                       <input
                         type="color"
                         value={bgColor}
                         onChange={(e) => setBgColor(e.target.value)}
-                        className="h-9 w-12 cursor-pointer border-2 border-black bg-transparent p-0"
+                        className="mc-color-input"
                       />
                       <span>{bgColor}</span>
                     </label>
                     <button
                       type="button"
                       onClick={() => setBgColor(DEFAULT_BG_COLOR)}
-                      className={`mc-btn mc-btn-stone mc-btn-sm ml-auto${bgColor === DEFAULT_BG_COLOR ? " invisible" : ""}`}
+                      className={cn(
+                        "mc-btn mc-btn-stone mc-btn-sm mc-ml-auto",
+                        bgColor === DEFAULT_BG_COLOR && "invisible"
+                      )}
                     >
                       Reset
                     </button>
@@ -405,7 +408,7 @@ const cancelGeneration = useCallback(() => {
                 type="button"
                 onClick={onGenerate}
                 disabled={generating || !previewReady || !!previewError}
-                className="mc-btn mc-btn-green mc-btn-hero w-full"
+                className="mc-btn mc-btn-green mc-btn-hero mc-btn-block"
               >
                 {generateLabel}
               </button>
@@ -414,9 +417,9 @@ const cancelGeneration = useCallback(() => {
         )}
       </div>
 
-      <footer className="fixed inset-x-0 bottom-0 z-10 flex items-end justify-between gap-3 px-3 py-2 text-[0.7rem] text-muted">
+      <footer className="mc-footer">
         <span>skinderdragon 1.0 — not affiliated with Mojang</span>
-        <span className="text-right">
+        <span>
           {edition === "bedrock" ? (
             <>lookup via <a href="https://api.geysermc.org">GeyserMC</a> · skins from Mojang&apos;s CDN</>
           ) : (

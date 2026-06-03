@@ -1,4 +1,5 @@
 import { type CSSProperties, type ReactNode } from "react";
+import { cn } from "../lib/ui";
 
 interface PreviewSlotProps {
   children: ReactNode;
@@ -11,9 +12,9 @@ interface PreviewSlotProps {
 export function PreviewSlot({ children, background = "#313233", className }: PreviewSlotProps) {
   const style: CSSProperties | undefined = background === "transparent" ? undefined : { background };
   return (
-    <div className="mc-slot p-0.5">
+    <div className="mc-slot">
       <div
-        className={["overflow-hidden leading-none size-85", className].filter(Boolean).join(" ")}
+        className={cn("mc-slot-inner", className)}
         style={style}
       >
         {children}

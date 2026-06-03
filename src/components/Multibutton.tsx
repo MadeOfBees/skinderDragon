@@ -1,4 +1,4 @@
-import { seg } from "../lib/ui";
+import { cn, seg } from "../lib/ui";
 
 interface Option<T> {
   label: string;
@@ -20,14 +20,14 @@ export function Multibutton<T>({
   className = "",
 }: MultibuttonProps<T>) {
   return (
-    <div className={`mc-anim-slider ${className}`}>
+    <div className={cn("mc-anim-slider", className)}>
       {options.map((opt) => (
         <button
           key={String(opt.value)}
           type="button"
           data-testid={opt.testId}
           aria-pressed={opt.value === value}
-          className={`mc-btn flex-1 ${seg(opt.value === value)}`}
+          className={cn("mc-btn", seg(opt.value === value))}
           onClick={() => onChange(opt.value)}
         >
           {opt.label}

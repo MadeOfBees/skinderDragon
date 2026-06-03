@@ -44,20 +44,20 @@ export function RenderModal({
       ariaLabel="Generated render"
       onClose={onClose}
       disabled={generating}
-      panelClassName="flex flex-col items-center"
+      panelClassName="mc-col-center"
       testId="render-modal"
     >
-      <div className="mc-modal-body flex w-full flex-col items-center">
-        <PreviewSlot background={background} className="relative">
+      <div className="mc-modal-body mc-col-center">
+        <PreviewSlot background={background}>
           {gifUrl && !generating ? (
             <img
               data-testid="result-gif"
               src={gifUrl}
               alt={`${username} ${poseLabel} ${format === "gif" ? "animation" : "render"}`}
-              className="pixelated block w-full h-full"
+              className="pixelated mc-slot-fill"
             />
           ) : (
-            <div className="grid w-full h-full place-items-center text-sm text-muted">
+            <div className="mc-slot-progress">
               {Math.round(progress * 100)}%
             </div>
           )}
@@ -69,14 +69,14 @@ export function RenderModal({
             <button
               type="button"
               onClick={onCancel}
-              className="mc-btn mc-btn-stone mt-4 w-full text-[0.8rem]"
+              className="mc-btn mc-btn-stone mc-btn-block mt-4 text-[0.8rem]"
             >
               Cancel
             </button>
           </>
         ) : (
           <>
-            <p className="mt-3 text-[0.7rem] text-muted">
+            <p className="mc-render-meta">
               {username} · {poseLabel}
               {orbit ? " + Orbit" : ""} · {size}×{size}
             </p>
@@ -85,7 +85,7 @@ export function RenderModal({
                 data-testid="download"
                 href={gifUrl}
                 download={downloadName}
-                className="mc-btn mc-btn-green mc-btn-hero mt-4 block w-full text-center"
+                className="mc-btn mc-btn-green mc-btn-hero mc-btn-block mt-4"
               >
                 <DownloadIcon /> Download {format.toUpperCase()}
               </a>
