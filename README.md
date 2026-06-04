@@ -276,4 +276,4 @@ trademark of Mojang Synergies AB.
 
 ## License
 
-[MIT](LICENSE).
+[CC BY-NC 4.0](LICENSE) — free to use and adapt, but not for commercial purposes.
